@@ -36,6 +36,7 @@ const translations = {
         statusError: "Error",
         btnOpenFile: "Open",
         btnOpenFolder: "Show in Folder",
+        btnTestConnection: "Test Connection",
         logInit: "[System] TD-markitdown console initialized. Waiting for files.",
         logSelectFiles: "[System] Selected {count} file(s).",
         logSelectFolder: "[System] Selected output directory: {path}",
@@ -82,6 +83,7 @@ const translations = {
         statusError: "Error",
         btnOpenFile: "Abrir",
         btnOpenFolder: "Ver carpeta",
+        btnTestConnection: "Probar Conexión",
         logInit: "[Sistema] Consola TD-markitdown inicializada. Esperando archivos.",
         logSelectFiles: "[Sistema] Se seleccionaron {count} archivo(s).",
         logSelectFolder: "[Sistema] Directorio de salida seleccionado: {path}",
@@ -122,6 +124,8 @@ const elements = {
     txtModelName: document.getElementById('txt-model-name'),
     customUrlGroup: document.getElementById('custom-url-group'),
     txtCustomUrl: document.getElementById('txt-custom-url'),
+    btnTestLlm: document.getElementById('btn-test-llm'),
+    txtTestConnection: document.getElementById('txt-test-connection'),
     
     txtLlmTitle: document.getElementById('txt-llm-title'),
     txtEnableLlm: document.getElementById('txt-enable-llm'),
@@ -174,47 +178,74 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Load Settings from LocalStorage
-function loadSettings() {
+// Load Settings from Backend API
+async function loadSettings() {
     state.lang = localStorage.getItem('td-lang') || 'en';
-    
-    const llmEnabled = localStorage.getItem('td-llm-enabled') === 'true';
-    elements.chkLlmEnabled.checked = llmEnabled;
-    if (llmEnabled) {
-        elements.llmFields.classList.remove('hidden');
-    }
-    
-    const provider = localStorage.getItem('td-llm-provider') || 'nvidia';
-    elements.selLlmProvider.value = provider;
-    updateProviderDefaults(provider);
-    
-    // Read model name if previously customized
-    const savedModel = localStorage.getItem('td-llm-model');
-    if (savedModel) elements.txtModelName.value = savedModel;
-    
-    const savedCustomUrl = localStorage.getItem('td-llm-custom-url');
-    if (savedCustomUrl) elements.txtCustomUrl.value = savedCustomUrl;
-    
-    const outputMode = localStorage.getItem('td-output-mode') || 'same_dir';
-    document.querySelector(`input[name="output-mode"][value="${outputMode}"]`).checked = true;
-    if (outputMode === 'custom_dir') {
-        elements.customDirSection.classList.remove('hidden');
-        state.customOutputDir = localStorage.getItem('td-custom-output-dir') || '';
-        elements.txtOutputPath.value = state.customOutputDir;
+    applyLanguage(); // Apply language strings immediately
+
+    try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+            const config = await response.json();
+            
+            if (config.llm_provider) {
+                elements.chkLlmEnabled.checked = config.llm_enabled;
+                if (config.llm_enabled) {
+                    elements.llmFields.classList.remove('hidden');
+                } else {
+                    elements.llmFields.classList.add('hidden');
+                }
+                
+                elements.selLlmProvider.value = config.llm_provider;
+                elements.txtApiKey.value = config.llm_api_key || '';
+                elements.txtModelName.value = config.llm_model || '';
+                elements.txtCustomUrl.value = config.llm_base_url || '';
+                
+                updateProviderDefaults(config.llm_provider);
+                
+                const outputMode = config.output_mode || 'same_dir';
+                const radio = document.querySelector(`input[name="output-mode"][value="${outputMode}"]`);
+                if (radio) radio.checked = true;
+                
+                if (outputMode === 'custom_dir') {
+                    elements.customDirSection.classList.remove('hidden');
+                    state.customOutputDir = config.output_dir || '';
+                    elements.txtOutputPath.value = state.customOutputDir;
+                } else {
+                    elements.customDirSection.classList.add('hidden');
+                }
+            }
+        }
+    } catch (err) {
+        logToConsole(`Failed to load persistent settings: ${err.message}`, 'error');
     }
 }
 
-// Save Settings to LocalStorage
-function saveSettings() {
-    localStorage.setItem('td-lang', state.lang);
-    localStorage.setItem('td-llm-enabled', elements.chkLlmEnabled.checked);
-    localStorage.setItem('td-llm-provider', elements.selLlmProvider.value);
-    localStorage.setItem('td-llm-model', elements.txtModelName.value);
-    localStorage.setItem('td-llm-custom-url', elements.txtCustomUrl.value);
+// Save Settings to Backend API
+async function saveSettings() {
+    localStorage.setItem('td-lang', state.lang); // Language is UI-only
     
-    const outputMode = document.querySelector('input[name="output-mode"]:checked').value;
-    localStorage.setItem('td-output-mode', outputMode);
-    localStorage.setItem('td-custom-output-dir', state.customOutputDir);
+    const outputMode = document.querySelector('input[name="output-mode"]:checked')?.value || 'same_dir';
+    
+    const config = {
+        llm_enabled: elements.chkLlmEnabled.checked,
+        llm_provider: elements.selLlmProvider.value,
+        llm_api_key: elements.txtApiKey.value,
+        llm_model: elements.txtModelName.value,
+        llm_base_url: elements.txtCustomUrl.value,
+        output_mode: outputMode,
+        output_dir: state.customOutputDir
+    };
+    
+    try {
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+    } catch (err) {
+        console.error("Failed to save config:", err);
+    }
 }
 
 // Setup Interactive Handlers
@@ -251,6 +282,12 @@ function setupEventListeners() {
     // Save inputs on change
     elements.txtModelName.addEventListener('change', saveSettings);
     elements.txtCustomUrl.addEventListener('change', saveSettings);
+    elements.txtApiKey.addEventListener('change', saveSettings);
+    
+    // Test Connection Click
+    if (elements.btnTestLlm) {
+        elements.btnTestLlm.addEventListener('click', testLLMConnection);
+    }
 
     // Toggle password eye
     elements.btnTogglePassword.addEventListener('click', () => {
@@ -357,6 +394,10 @@ function updateProviderDefaults(provider) {
         elements.txtApiKey.placeholder = "sk-proj-... (OpenAI API Key)";
         elements.txtModelName.placeholder = "gpt-4o";
         elements.customUrlGroup.classList.add('hidden');
+    } else if (provider === 'openrouter') {
+        elements.txtApiKey.placeholder = "sk-or-... (OpenRouter API Key)";
+        elements.txtModelName.placeholder = "google/gemini-2.5-flash";
+        elements.customUrlGroup.classList.add('hidden');
     } else { // Custom
         elements.txtApiKey.placeholder = "API Key";
         elements.txtModelName.placeholder = "custom-model-id";
@@ -379,6 +420,7 @@ function applyLanguage() {
     elements.txtApiKeyLabel.textContent = dict.apiKeyLabel;
     elements.txtModelNameLabel.textContent = dict.modelNameLabel;
     elements.txtCustomUrlLabel.textContent = dict.customUrlLabel;
+    elements.txtTestConnection.textContent = dict.btnTestConnection;
     
     // Output settings
     elements.txtOutputTitle.textContent = dict.outputTitle;
@@ -768,3 +810,53 @@ window.openResultFolder = async function(event, path) {
         logToConsole(`Error opening folder: ${err.message}`, 'error');
     }
 };
+
+// Test LLM Connection API Call
+async function testLLMConnection() {
+    const provider = elements.selLlmProvider.value;
+    const apiKey = elements.txtApiKey.value;
+    const modelName = elements.txtModelName.value;
+    const customUrl = elements.txtCustomUrl.value;
+    
+    if (!apiKey) {
+        const errorMsg = state.lang === 'en' ? "Please enter an API Key first" : "Por favor, ingresa una clave de API primero";
+        logToConsole(`[Warning] ${errorMsg}`, 'error');
+        alert(errorMsg);
+        return;
+    }
+    
+    elements.btnTestLlm.disabled = true;
+    const originalText = elements.txtTestConnection.textContent;
+    elements.txtTestConnection.textContent = state.lang === 'en' ? "Testing..." : "Probando...";
+    
+    logToConsole(state.lang === 'en' ? `[System] Testing connection to ${provider}...` : `[Sistema] Probando conexión con ${provider}...`, 'info');
+    
+    try {
+        const response = await fetch('/api/test-llm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                llm_provider: provider,
+                llm_api_key: apiKey,
+                llm_model: modelName,
+                llm_base_url: customUrl
+            })
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            logToConsole(`[Success] ${data.message}`, 'success');
+            alert(data.message);
+        } else {
+            const errMsg = data.detail || "Connection failed";
+            logToConsole(`[Error] LLM Connection Failed: ${errMsg}`, 'error');
+            alert(`Connection Failed: ${errMsg}`);
+        }
+    } catch (err) {
+        logToConsole(`[Error] Request failed: ${err.message}`, 'error');
+        alert(`Request failed: ${err.message}`);
+    } finally {
+        elements.btnTestLlm.disabled = false;
+        elements.txtTestConnection.textContent = originalText;
+    }
+}

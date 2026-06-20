@@ -30,9 +30,11 @@ While standard documents (Word, Excel, PowerPoint, CSV, HTML) convert offline wi
      - Default Model: `meta/llama-3.2-11b-vision-instruct`
    - **OpenAI**: Requires an OpenAI API Key.
      - Default Model: `gpt-4o`
+   - **OpenRouter**: Highly popular LLM provider. Supports many models.
+     - Default Model: `google/gemini-2.5-flash`
    - **Custom**: For local LLM APIs (like Ollama or LocalAI) or other OpenAI-compatible APIs.
      - Requires entering your Custom Base URL (e.g. `http://localhost:11434/v1` for Ollama).
-4. Enter your **API Key** (stored securely in memory during your session, and other configuration fields are persisted in your browser's local storage).
+4. Enter your **API Key** (stored securely on disk in `backend/config.json`, which is excluded from Git to prevent leaks).
 5. Click **Convert Queue**. Files that require an LLM will now use the configured model to generate captions or transcripts.
 
 ---

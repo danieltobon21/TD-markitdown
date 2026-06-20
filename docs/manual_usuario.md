@@ -30,9 +30,11 @@ Mientras que los documentos estándar (Word, Excel, PowerPoint, CSV, HTML) se co
      - Modelo por defecto: `meta/llama-3.2-11b-vision-instruct`
    - **OpenAI**: Requiere una clave de API de OpenAI.
      - Modelo por defecto: `gpt-4o`
+   - **OpenRouter**: Proveedor de LLM sumamente popular que soporta una gran variedad de modelos.
+     - Modelo por defecto: `google/gemini-2.5-flash`
    - **Personalizado**: Para APIs locales (como Ollama o LocalAI) u otros proveedores compatibles con el SDK de OpenAI.
      - Requiere ingresar la URL Base (ej. `http://localhost:11434/v1` para Ollama).
-4. Introduce tu **Clave de API (API Key)**. (Se mantiene segura en la memoria de la sesión del navegador, mientras que las otras configuraciones se guardan en el almacenamiento local).
+4. Introduce tu **Clave de API (API Key)**. (Se guarda localmente de forma segura en `backend/config.json`, la cual está excluida en Git para evitar filtraciones).
 5. Haz clic en **Convertir Cola**. Los archivos que requieran procesamiento avanzado utilizarán el modelo seleccionado para generar las descripciones o transcripciones.
 
 ---

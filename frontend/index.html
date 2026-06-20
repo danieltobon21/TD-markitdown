@@ -91,6 +91,7 @@
                                 <select id="sel-llm-provider">
                                     <option value="nvidia">Nvidia NIM (Free Trial API)</option>
                                     <option value="openai">OpenAI</option>
+                                    <option value="openrouter">OpenRouter</option>
                                     <option value="custom">Custom Endpoint</option>
                                 </select>
                             </div>
@@ -111,6 +112,12 @@
                             <div class="form-group hidden" id="custom-url-group">
                                 <label for="txt-custom-url" id="txt-custom-url-label">Custom Base URL</label>
                                 <input type="text" id="txt-custom-url" placeholder="https://api.yourprovider.com/v1">
+                            </div>
+
+                            <div class="form-group" style="margin-top: 15px;">
+                                <button id="btn-test-llm" class="btn btn-secondary" style="width: 100%; border-color: rgba(168, 85, 247, 0.35); background-color: rgba(168, 85, 247, 0.05);" type="button">
+                                    <span id="txt-test-connection">Test Connection</span>
+                                </button>
                             </div>
                         </div>
                     </div>

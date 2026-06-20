@@ -165,15 +165,22 @@ def convert_file(req: ConvertRequest):
             api_key = req.llm_api_key
             model = req.llm_model or "gpt-4o"
             base_url = None
+            default_headers = None
             
             if req.llm_provider == "nvidia":
                 base_url = "https://integrate.api.nvidia.com/v1"
-                # Set default nvidia vision model if not customized
                 model = req.llm_model or "meta/llama-3.2-11b-vision-instruct"
+            elif req.llm_provider == "openrouter":
+                base_url = "https://openrouter.ai/api/v1"
+                model = req.llm_model or "google/gemini-2.5-flash"
+                default_headers = {
+                    "HTTP-Referer": "https://tobondigital.com",
+                    "X-Title": "TD-markitdown"
+                }
             elif req.llm_provider == "custom" and req.llm_base_url:
                 base_url = req.llm_base_url
             
-            llm_client = OpenAI(api_key=api_key, base_url=base_url)
+            llm_client = OpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers)
             llm_model = model
             
         # Initialize MarkItDown
@@ -198,6 +205,90 @@ def convert_file(req: ConvertRequest):
         import traceback
         error_details = traceback.format_exc()
         print(error_details)
+        raise HTTPException(status_code=500, detail=str(e))
+
+import json
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_config(config_data):
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+class SettingsModel(BaseModel):
+    llm_enabled: bool
+    llm_provider: str
+    llm_api_key: str
+    llm_model: str
+    llm_base_url: str
+    output_mode: str
+    output_dir: str
+
+class TestLLMRequest(BaseModel):
+    llm_provider: str
+    llm_api_key: str
+    llm_model: str
+    llm_base_url: Optional[str] = None
+
+@app.get("/api/settings")
+def get_settings():
+    return load_config()
+
+@app.post("/api/settings")
+def save_settings_endpoint(settings: SettingsModel):
+    success = save_config(settings.dict())
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save settings")
+    return {"success": True}
+
+@app.post("/api/test-llm")
+def test_llm_connection(req: TestLLMRequest):
+    if not req.llm_api_key:
+        raise HTTPException(status_code=400, detail="API Key is required")
+    api_key = req.llm_api_key
+    model = req.llm_model or "gpt-4o"
+    base_url = None
+    default_headers = None
+    if req.llm_provider == "nvidia":
+        base_url = "https://integrate.api.nvidia.com/v1"
+        model = req.llm_model or "meta/llama-3.2-11b-vision-instruct"
+    elif req.llm_provider == "openrouter":
+        base_url = "https://openrouter.ai/api/v1"
+        model = req.llm_model or "google/gemini-2.5-flash"
+        default_headers = {
+            "HTTP-Referer": "https://tobondigital.com",
+            "X-Title": "TD-markitdown"
+        }
+    elif req.llm_provider == "custom" and req.llm_base_url:
+        base_url = req.llm_base_url
+    try:
+        client = OpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers, timeout=10.0)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Respond with one word: Connection successful"}],
+            max_tokens=5
+        )
+        reply = response.choices[0].message.content.strip()
+        return {
+            "success": True,
+            "message": f"Connection verified! Response: \"{reply}\""
+        }
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 # Mount static frontend assets
