@@ -32,19 +32,34 @@ This application is powered by the excellent open-source library [Microsoft Mark
 
 ## Installation & Usage (Windows)
 
-TD-markitdown includes a self-bootstrapping script that installs Python dependencies within a local virtual environment to keep your system clean.
+TD-markitdown includes a self-bootstrapping process that sets up all dependencies within a local, sandboxed virtual environment (`.venv`).
 
 ### Prerequisites
 - [Python 3.10 or higher](https://www.python.org/downloads/) installed. Ensure you check **"Add Python to PATH"** during installation.
 
 ### Running the App
 1. Clone or download this repository to your machine.
-2. Double-click the `run.bat` file in the root folder.
-3. The launcher will automatically:
-   - Create a Python virtual environment (`.venv`).
-   - Upgrade `pip` and install all required packages.
-   - Boot up the FastAPI local server.
-   - Open the TD-markitdown application in your default web browser (`http://127.0.0.1:8000`).
+2. Double-click the compiled **`TD-markitdown.exe`** launcher in the root folder.
+3. The application will start silently (no command prompt window shown) and launch a native desktop application window.
+4. *Alternative*: You can also run the app by running `run.bat` (or typing `.\run.bat` in a terminal).
+
+### Checking & Updating MarkItDown
+At the bottom of the desktop application window, you will see a system status footer displaying the active Python version and the currently installed version of the core `markitdown` library.
+* Whenever Microsoft publishes updates or modifications, click the **"Update Core"** button in the footer.
+* The application will run `pip install --upgrade markitdown[all]` asynchronously, stream the installation log in real-time to the console, and refresh the version once completed.
+
+### Compiling the Launcher Executable
+If you ever want to re-compile the launcher binary `TD-markitdown.exe` yourself:
+1. Open PowerShell in the project directory.
+2. Activate the virtual environment and install pyinstaller:
+   ```powershell
+   .\.venv\Scripts\pip.exe install pyinstaller
+   ```
+3. Run the compilation command:
+   ```powershell
+   .\.venv\Scripts\pyinstaller.exe --onefile --noconsole --icon=frontend/logo_t.png --name=TD-markitdown launcher.py
+   ```
+4. The new executable will be available inside the `dist/` directory. Move it to the root folder of the project.
 
 ---
 

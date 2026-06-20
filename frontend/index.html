@@ -8,7 +8,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Link to Stylesheet -->
     <link rel="stylesheet" href="/frontend/style.css">
 </head>
@@ -23,19 +23,10 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-logo-section" id="logo-trigger" style="cursor: pointer;">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#logo-grad)" stroke="#a855f7" stroke-width="1.5" stroke-linejoin="round"/>
-                        <path d="M2 17L12 22L22 17" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M2 12L12 17L22 12" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <defs>
-                            <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                                <stop stop-color="#3b82f6"/>
-                                <stop offset="1" stop-color="#ec4899"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
+                <div class="logo-icon-brand">
+                    <img src="/frontend/logo_text.png" alt="TobonDigital Logo" style="height: 38px; object-fit: contain;">
                 </div>
+                <div class="logo-divider"></div>
                 <div>
                     <h1 class="app-title">TD-markitdown</h1>
                     <p class="app-subtitle" id="txt-subtitle">Convert your documents to clean Markdown with Microsoft MarkItDown</p>
@@ -249,6 +240,27 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-system-info">
+                <span>Python: <strong id="lbl-python-ver">...</strong></span>
+                <span class="info-dot">•</span>
+                <span>Microsoft MarkItDown: <strong id="lbl-mid-ver">...</strong></span>
+            </div>
+            <div class="footer-branding">
+                <span>&copy; 2026 <a href="https://tobondigital.com" target="_blank" style="color: var(--color-primary); text-decoration: none; font-weight: 500;">TobonDigital.com</a>. Developed by <strong>dtmadman</strong></span>
+            </div>
+            <div class="footer-actions">
+                <button id="btn-update-core" class="btn btn-secondary btn-xs" style="font-size: 0.75rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M23 4v6h-6M1 20v-6h6"></path>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span id="txt-update-core">Update Core</span>
+                </button>
+            </div>
+        </footer>
     </div>
     
     <!-- Easter Egg Modal -->

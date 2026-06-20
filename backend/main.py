@@ -5,6 +5,8 @@
 # =========================================================================
 
 import os
+import sys
+import subprocess
 import tkinter as tk
 from tkinter import filedialog
 import threading
@@ -12,13 +14,15 @@ import webbrowser
 import time
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
 from markitdown import MarkItDown
 from openai import OpenAI
+import webview
+
 
 app = FastAPI(title="TD-markitdown Backend")
 
@@ -291,6 +295,44 @@ def test_llm_connection(req: TestLLMRequest):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/system-info")
+def get_system_info():
+    import importlib.metadata
+    try:
+        md_version = importlib.metadata.version("markitdown")
+    except Exception:
+        md_version = "Unknown"
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    return {
+        "markitdown_version": md_version,
+        "python_version": python_version
+    }
+
+@app.post("/api/update-core")
+def update_core():
+    def generate():
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "markitdown[all]", "--upgrade-strategy", "only-if-needed"]
+        yield "[System] Starting update process...\n"
+        yield f"[System] Running command: {' '.join(cmd)}\n\n"
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            for line in process.stdout:
+                yield line
+            process.wait()
+            if process.returncode == 0:
+                yield "\n[System] Update completed successfully!\n"
+            else:
+                yield f"\n[System] Update failed with exit code {process.returncode}\n"
+        except Exception as e:
+            yield f"\n[System] Error during update: {str(e)}\n"
+    return StreamingResponse(generate(), media_type="text/plain")
+
 # Mount static frontend assets
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
@@ -300,8 +342,32 @@ def open_browser():
     time.sleep(1.5)
     webbrowser.open("http://127.0.0.1:8000")
 
-if __name__ == "__main__":
-    # Start browser-opening thread
-    threading.Thread(target=open_browser, daemon=True).start()
-    # Run uvicorn server
+def start_server():
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+
+if __name__ == "__main__":
+    if "--no-gui" in sys.argv:
+        # Start browser-opening thread
+        threading.Thread(target=open_browser, daemon=True).start()
+        # Run uvicorn server in main thread
+        start_server()
+    else:
+        # Start FastAPI server in a daemon thread
+        server_thread = threading.Thread(target=start_server, daemon=True)
+        server_thread.start()
+        
+        # Wait for the server to be ready
+        time.sleep(1.2)
+        
+        # Create webview window pointing to local FastAPI server
+        webview.create_window(
+            "TD-markitdown - TobonDigital",
+            "http://127.0.0.1:8000",
+            width=1220,
+            height=850,
+            min_size=(950, 700)
+        )
+        webview.start()
+        print("Window closed. Exiting application.")
+        sys.exit(0)
+

@@ -32,19 +32,34 @@ Esta aplicación funciona gracias a la excelente biblioteca de código abierto [
 
 ## Instalación y Uso (Windows)
 
-TD-markitdown incluye un script autoejecutable que instala las dependencias de Python dentro de un entorno virtual local para mantener limpio tu sistema.
+TD-markitdown incluye un proceso autoejecutable que instala las dependencias de Python dentro de un entorno virtual local (`.venv`) para mantener limpio tu sistema.
 
 ### Requisitos Previos
 - Tener instalado [Python 3.10 o superior](https://www.python.org/downloads/). Asegúrate de marcar la casilla **"Add Python to PATH"** durante la instalación.
 
 ### Ejecución de la Aplicación
 1. Clona o descarga este repositorio en tu equipo.
-2. Haz doble clic en el archivo `run.bat` en la carpeta raíz.
-3. El lanzador realizará automáticamente lo siguiente:
-   - Creará un entorno virtual de Python (`.venv`).
-   - Actualizará `pip` e instalará los paquetes requeridos.
-   - Iniciará el servidor local de FastAPI.
-   - Abrirá la aplicación TD-markitdown en tu navegador web predeterminado (`http://127.0.0.1:8000`).
+2. Haz doble clic en el lanzador compilado **`TD-markitdown.exe`** en la carpeta raíz.
+3. La aplicación se iniciará de forma silenciosa (sin mostrar la ventana negra de la terminal) y abrirá una ventana de aplicación de escritorio nativa.
+4. *Alternativa*: También puedes ejecutar la aplicación haciendo doble clic en `run.bat` (o ejecutando `.\run.bat` en una terminal).
+
+### Comprobar y Actualizar MarkItDown
+En la parte inferior de la ventana de escritorio, verás un pie de página de estado del sistema que muestra la versión activa de Python y la versión actual de la biblioteca principal `markitdown`.
+* Cada vez que Microsoft publique nuevas versiones o modificaciones, haz clic en el botón **"Actualizar Núcleo"** en el pie de página.
+* La aplicación ejecutará `pip install --upgrade markitdown[all]` de forma asíncrona, transmitirá el log de instalación en tiempo real a la consola y actualizará el número de versión una vez completado.
+
+### Compilar el Ejecutable Lanzador
+Si en algún momento deseas volver a compilar el binario del lanzador `TD-markitdown.exe` por ti mismo:
+1. Abre PowerShell en el directorio del proyecto.
+2. Activa el entorno virtual e instala pyinstaller:
+   ```powershell
+   .\.venv\Scripts\pip.exe install pyinstaller
+   ```
+3. Ejecuta el comando de compilación:
+   ```powershell
+   .\.venv\Scripts\pyinstaller.exe --onefile --noconsole --icon=frontend/logo_t.png --name=TD-markitdown launcher.py
+   ```
+4. El nuevo ejecutable estará disponible dentro de la carpeta `dist/`. Muévelo a la carpeta raíz del proyecto.
 
 ---
 

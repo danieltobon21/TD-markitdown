@@ -50,7 +50,11 @@ const translations = {
         logConsoleCleared: "[System] Console log cleared.",
         logNoFiles: "[Warning] No files in the queue to convert.",
         logDragOver: "[System] Dragging files over dropzone...",
-        logDropped: "[System] Dropped {count} file(s)."
+        logDropped: "[System] Dropped {count} file(s).",
+        txtUpdateCore: "Update Core",
+        logUpdateStart: "[System] Core upgrade started. Checking for dependencies...",
+        logUpdateCompleted: "[Success] Core upgraded successfully! Refreshing version info.",
+        logUpdateError: "[Error] Failed to upgrade core: {error}"
     },
     es: {
         subtitle: "Convierte tus documentos a Markdown limpio usando Microsoft MarkItDown",
@@ -97,7 +101,11 @@ const translations = {
         logConsoleCleared: "[Sistema] Consola de registros limpia.",
         logNoFiles: "[Advertencia] No hay archivos en la cola para convertir.",
         logDragOver: "[Sistema] Arrastrando archivos sobre la zona de descarga...",
-        logDropped: "[Sistema] Se soltaron {count} archivo(s)."
+        logDropped: "[Sistema] Se soltaron {count} archivo(s).",
+        txtUpdateCore: "Actualizar Núcleo",
+        logUpdateStart: "[Sistema] Actualización del núcleo iniciada. Comprobando dependencias...",
+        logUpdateCompleted: "[Éxito] ¡Núcleo actualizado con éxito! Recargando información de versión.",
+        logUpdateError: "[Error] No se pudo actualizar el núcleo: {error}"
     }
 };
 
@@ -168,7 +176,13 @@ const elements = {
     
     txtConsoleTitle: document.getElementById('txt-console-title'),
     btnClearConsole: document.getElementById('btn-clear-console'),
-    consoleLogs: document.getElementById('console-logs')
+    consoleLogs: document.getElementById('console-logs'),
+    
+    // System Info Footer
+    lblPythonVer: document.getElementById('lbl-python-ver'),
+    lblMidVer: document.getElementById('lbl-mid-ver'),
+    btnUpdateCore: document.getElementById('btn-update-core'),
+    txtUpdateCore: document.getElementById('txt-update-core')
 };
 
 // Initialize Application
@@ -176,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     applyLanguage();
     setupEventListeners();
+    loadSystemInfo();
 });
 
 // Load Settings from Backend API
@@ -363,6 +378,11 @@ function setupEventListeners() {
         logToConsole(getTranslation('logConsoleCleared'), 'system');
     });
 
+    // Update Core Click
+    if (elements.btnUpdateCore) {
+        elements.btnUpdateCore.addEventListener('click', updateCoreLibrary);
+    }
+
     // Easter Egg: Click logo 5 times or press Ctrl + Alt + T
     const logoTrigger = document.getElementById('logo-trigger');
     let logoClicks = 0;
@@ -447,6 +467,11 @@ function applyLanguage() {
     
     // Console
     elements.txtConsoleTitle.textContent = dict.consoleTitle;
+    
+    // System Info Footer
+    if (elements.txtUpdateCore) {
+        elements.txtUpdateCore.textContent = dict.txtUpdateCore;
+    }
     
     // Refresh queue UI to translate active labels
     updateQueueUI();
@@ -860,3 +885,85 @@ async function testLLMConnection() {
         elements.txtTestConnection.textContent = originalText;
     }
 }
+
+// Fetch Python and MarkItDown version info
+async function loadSystemInfo() {
+    try {
+        const response = await fetch('/api/system-info');
+        if (response.ok) {
+            const data = await response.json();
+            if (elements.lblPythonVer) elements.lblPythonVer.textContent = data.python_version || 'Unknown';
+            if (elements.lblMidVer) elements.lblMidVer.textContent = data.markitdown_version || 'Unknown';
+        }
+    } catch (err) {
+        console.error("Failed to load system info:", err);
+    }
+}
+
+// Upgrade Microsoft MarkItDown library and stream logs
+async function updateCoreLibrary() {
+    if (!elements.btnUpdateCore) return;
+    
+    // Lock UI state and disable button
+    elements.btnUpdateCore.disabled = true;
+    const refreshIcon = elements.btnUpdateCore.querySelector('.icon-refresh');
+    if (refreshIcon) refreshIcon.classList.add('spin');
+    
+    logToConsole(getTranslation('logUpdateStart'), 'system');
+    
+    try {
+        const response = await fetch('/api/update-core', { method: 'POST' });
+        
+        if (!response.ok) {
+            throw new Error(`Server returned status ${response.status}`);
+        }
+        
+        // Handle streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+        let partialLine = '';
+        
+        while (!done) {
+            const { value, done: doneReading } = await reader.read();
+            done = doneReading;
+            
+            if (value) {
+                const chunk = decoder.decode(value, { stream: !done });
+                const lines = (partialLine + chunk).split('\n');
+                partialLine = lines.pop(); // Hold the last unfinished line
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        // Classify line based on content to make console beautiful
+                        let type = 'info';
+                        if (line.includes('[System]')) type = 'system';
+                        else if (line.toLowerCase().includes('successfully installed') || line.includes('completed successfully')) type = 'success';
+                        else if (line.toLowerCase().includes('error') || line.toLowerCase().includes('failed')) type = 'error';
+                        
+                        logToConsole(line, type);
+                    }
+                }
+            }
+        }
+        
+        // Handle remaining text
+        if (partialLine && partialLine.trim()) {
+            logToConsole(partialLine, 'info');
+        }
+        
+        logToConsole(getTranslation('logUpdateCompleted'), 'success');
+        
+        // Reload system info
+        await loadSystemInfo();
+        
+    } catch (err) {
+        const errMsg = getTranslation('logUpdateError').replace('{error}', err.message);
+        logToConsole(errMsg, 'error');
+        alert(errMsg);
+    } finally {
+        elements.btnUpdateCore.disabled = false;
+        if (refreshIcon) refreshIcon.classList.remove('spin');
+    }
+}
+
