@@ -6,6 +6,20 @@
 
 import os
 import sys
+
+# Determine the application base directory depending on whether running frozen or as script
+if getattr(sys, 'frozen', False):
+    base_dir = os.path.dirname(sys.executable)
+else:
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# If running as a frozen PyInstaller executable, dynamically prioritize
+# the local virtual environment's site-packages to allow dynamic core upgrades.
+if getattr(sys, 'frozen', False):
+    venv_site_packages = os.path.join(base_dir, ".venv", "Lib", "site-packages")
+    if os.path.exists(venv_site_packages):
+        sys.path.insert(0, venv_site_packages)
+
 import subprocess
 import threading
 import webbrowser
@@ -276,7 +290,7 @@ def convert_file(req: ConvertRequest):
 
 import json
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+CONFIG_PATH = os.path.join(base_dir, "backend", "config.json")
 
 def load_config():
     if os.path.exists(CONFIG_PATH):
@@ -398,7 +412,7 @@ def update_core():
     return StreamingResponse(generate(), media_type="text/plain")
 
 # Mount static frontend assets
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+frontend_dir = os.path.abspath(os.path.join(base_dir, "frontend"))
 app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
 
 def open_browser():
@@ -426,17 +440,6 @@ if __name__ == "__main__":
         # Run uvicorn server in main thread
         start_server()
     else:
-        # Initialize CLR on the main GUI thread before starting event loop
-        # to prevent thread-safety/GIL deadlocks in pythonnet
-        clr_available = False
-        try:
-            import clr
-            clr.AddReference('System.Drawing')
-            import System.Drawing
-            clr_available = True
-        except Exception as e:
-            print("[Warning] Failed to initialize .NET CLR on main thread:", e)
-
         import webview
         
         # Start FastAPI server in a background daemon thread
@@ -444,8 +447,7 @@ if __name__ == "__main__":
         server_thread.start()
         
         # Determine the local index.html file path
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        index_path = os.path.join(base_dir, "frontend", "index.html")
+        index_path = os.path.join(frontend_dir, "index.html")
         
         # Create WebviewApi instance
         api = WebviewApi()
@@ -460,19 +462,8 @@ if __name__ == "__main__":
             min_size=(950, 700)
         )
         api.window = window
-        
-        def set_window_icon():
-            if clr_available:
-                try:
-                    import System.Drawing
-                    icon_path = os.path.join(base_dir, "frontend", "logo_t.ico")
-                    if os.path.exists(icon_path):
-                        window.native.Icon = System.Drawing.Icon(icon_path)
-                        print("[System] Native window icon loaded successfully.")
-                except Exception as e:
-                    print("[Warning] Failed to set native window icon:", e)
 
-        webview.start(set_window_icon)
+        webview.start()
         print("Window closed. Exiting application.")
         sys.exit(0)
 
