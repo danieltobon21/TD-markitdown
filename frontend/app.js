@@ -34,6 +34,8 @@ const translations = {
         statusConverting: "Converting",
         statusSuccess: "Success",
         statusError: "Error",
+        btnOpenFile: "Open",
+        btnOpenFolder: "Show in Folder",
         logInit: "[System] TD-markitdown console initialized. Waiting for files.",
         logSelectFiles: "[System] Selected {count} file(s).",
         logSelectFolder: "[System] Selected output directory: {path}",
@@ -78,6 +80,8 @@ const translations = {
         statusConverting: "Convirtiendo",
         statusSuccess: "Completado",
         statusError: "Error",
+        btnOpenFile: "Abrir",
+        btnOpenFolder: "Ver carpeta",
         logInit: "[Sistema] Consola TD-markitdown inicializada. Esperando archivos.",
         logSelectFiles: "[Sistema] Se seleccionaron {count} archivo(s).",
         logSelectFolder: "[Sistema] Directorio de salida seleccionado: {path}",
@@ -523,7 +527,21 @@ function updateQueueUI() {
         } else if (file.status === 'converting') {
             statusBadge = `<span class="status-badge converting"><div class="spinner"></div> ${getTranslation('statusConverting')}</span>`;
         } else if (file.status === 'success') {
-            statusBadge = `<span class="status-badge success">✓ ${getTranslation('statusSuccess')}</span>`;
+            statusBadge = `
+                <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                    <span class="status-badge success">✓ ${getTranslation('statusSuccess')}</span>
+                    <div class="success-actions">
+                        <button class="btn-action-link" onclick="openResultFile(event, '${file.outputPath.replace(/\\/g, '\\\\')}')" title="${getTranslation('btnOpenFile')}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                            <span>${getTranslation('btnOpenFile')}</span>
+                        </button>
+                        <button class="btn-action-link" onclick="openResultFolder(event, '${file.outputPath.replace(/\\/g, '\\\\')}')" title="${getTranslation('btnOpenFolder')}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            <span>${getTranslation('btnOpenFolder')}</span>
+                        </button>
+                    </div>
+                </div>
+            `;
         } else if (file.status === 'error') {
             statusBadge = `<span class="status-badge error" title="${file.error || ''}">✗ ${getTranslation('statusError')}</span>`;
         }
@@ -678,6 +696,7 @@ async function startQueueConversion() {
 
             const resData = await response.json();
             file.status = 'success';
+            file.outputPath = resData.output_path;
             successCount++;
             
             const successMsg = getTranslation('logConvertedSuccess')
@@ -730,3 +749,22 @@ function showEasterEgg() {
         modal.addEventListener('click', outsideClickHandler);
     }
 }
+
+// Window actions to open files and folders
+window.openResultFile = async function(event, path) {
+    if (event) event.stopPropagation();
+    try {
+        await fetch(`/api/open-file?path=${encodeURIComponent(path)}`);
+    } catch (err) {
+        logToConsole(`Error opening file: ${err.message}`, 'error');
+    }
+};
+
+window.openResultFolder = async function(event, path) {
+    if (event) event.stopPropagation();
+    try {
+        await fetch(`/api/open-folder?path=${encodeURIComponent(path)}`);
+    } catch (err) {
+        logToConsole(`Error opening folder: ${err.message}`, 'error');
+    }
+};

@@ -108,6 +108,28 @@ def select_folder():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/open-file")
+def open_file(path: str):
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        os.startfile(path)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/open-folder")
+def open_folder(path: str):
+    import subprocess
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        # Highlight file in explorer
+        subprocess.run(['explorer', '/select,', os.path.normpath(path)])
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/convert-file")
 def convert_file(req: ConvertRequest):
     if not os.path.exists(req.filepath):
