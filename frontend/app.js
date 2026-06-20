@@ -506,15 +506,21 @@ async function selectOutputFolder() {
     if (state.isConverting) return;
     try {
         logToConsole("Opening folder dialog...", "info");
-        const response = await fetch('/api/select-folder');
-        const data = await response.json();
+        let folder = null;
+        if (window.pywebview && window.pywebview.api) {
+            folder = await window.pywebview.api.select_folder();
+        } else {
+            const response = await fetch('/api/select-folder');
+            const data = await response.json();
+            folder = data.folder;
+        }
         
-        if (data.folder) {
-            state.customOutputDir = data.folder;
-            elements.txtOutputPath.value = data.folder;
+        if (folder) {
+            state.customOutputDir = folder;
+            elements.txtOutputPath.value = folder;
             saveSettings();
             
-            const msg = getTranslation('logSelectFolder').replace('{path}', data.folder);
+            const msg = getTranslation('logSelectFolder').replace('{path}', folder);
             logToConsole(msg, 'success');
         } else {
             logToConsole(getTranslation('logSelectFolderCancel'), 'info');
@@ -529,30 +535,45 @@ async function selectFilesFromSystem() {
     if (state.isConverting) return;
     try {
         logToConsole("Opening file dialog...", "info");
-        const response = await fetch('/api/select-files');
-        const data = await response.json();
+        let paths = [];
+        if (window.pywebview && window.pywebview.api) {
+            paths = await window.pywebview.api.select_files();
+        } else {
+            const response = await fetch('/api/select-files');
+            const data = await response.json();
+            paths = data.files ? data.files.map(f => f.path) : [];
+        }
         
-        if (data.files && data.files.length > 0) {
-            // Append only non-duplicate paths
-            let addedCount = 0;
-            data.files.forEach(f => {
-                if (!state.files.some(existing => existing.path === f.path)) {
-                    state.files.push({
-                        path: f.path,
-                        name: f.name,
-                        size: f.size,
-                        type: f.type,
-                        status: 'pending', // pending, converting, success, error
-                        error: null
-                    });
-                    addedCount++;
-                }
+        if (paths && paths.length > 0) {
+            // Retrieve metadata from backend for the selected files
+            const response = await fetch('/api/file-metadata', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: paths })
             });
+            const data = await response.json();
             
-            updateQueueUI();
-            
-            const msg = getTranslation('logSelectFiles').replace('{count}', addedCount);
-            logToConsole(msg, 'success');
+            if (data.files && data.files.length > 0) {
+                let addedCount = 0;
+                data.files.forEach(f => {
+                    if (!state.files.some(existing => existing.path === f.path)) {
+                        state.files.push({
+                            path: f.path,
+                            name: f.name,
+                            size: f.size,
+                            type: f.type,
+                            status: 'pending',
+                            error: null
+                        });
+                        addedCount++;
+                    }
+                });
+                
+                updateQueueUI();
+                
+                const msg = getTranslation('logSelectFiles').replace('{count}', addedCount);
+                logToConsole(msg, 'success');
+            }
         }
     } catch (err) {
         logToConsole(`[Error] File dialog failed: ${err.message}`, 'error');

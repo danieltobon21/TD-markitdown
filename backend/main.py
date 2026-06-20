@@ -24,6 +24,44 @@ from openai import OpenAI
 import webview
 
 
+class WebviewApi:
+    def __init__(self):
+        self.window = None
+
+    def select_files(self):
+        if self.window:
+            file_types = (
+                "All Supported Files (*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip)",
+                "PDF Documents (*.pdf)",
+                "Word Documents (*.docx)",
+                "Excel Sheets (*.xlsx;*.xls)",
+                "PowerPoint Presentations (*.pptx)",
+                "Web & Structured (*.html;*.csv;*.json;*.xml)",
+                "Images (*.png;*.jpg;*.jpeg)",
+                "Audio (*.mp3;*.wav)",
+                "Archives (*.zip)",
+                "All Files (*.*)"
+            )
+            res = self.window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                allow_multiple=True,
+                file_types=file_types
+            )
+            return list(res) if res else []
+        return []
+
+    def select_folder(self):
+        if self.window:
+            res = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+            if res:
+                if isinstance(res, tuple) or isinstance(res, list):
+                    return res[0] if len(res) > 0 else None
+                return res
+            return None
+        return None
+
+
+
 app = FastAPI(title="TD-markitdown Backend")
 
 # Allow CORS for local development
@@ -111,6 +149,23 @@ class ConvertRequest(BaseModel):
     llm_model: Optional[str] = None
     llm_base_url: Optional[str] = None
 
+class MetadataRequest(BaseModel):
+    paths: List[str]
+
+@app.post("/api/file-metadata")
+def get_file_metadata(req: MetadataRequest):
+    files_metadata = []
+    for path in req.paths:
+        if os.path.exists(path):
+            stat = os.stat(path)
+            files_metadata.append({
+                "path": path,
+                "name": os.path.basename(path),
+                "size": stat.st_size,
+                "type": os.path.splitext(path)[1].lower()
+            })
+    return {"files": files_metadata}
+
 @app.get("/")
 def read_root():
     # Serve index.html from frontend folder
@@ -132,6 +187,8 @@ def select_files():
                 })
         return {"files": files_metadata}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/select-folder")
@@ -140,6 +197,8 @@ def select_folder():
         path = open_folder_dialog()
         return {"folder": path if path else None}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/open-file")
@@ -389,14 +448,19 @@ if __name__ == "__main__":
         # Wait for the server to be ready
         time.sleep(1.2)
         
+        # Create WebviewApi instance
+        api = WebviewApi()
+        
         # Create webview window pointing to local FastAPI server
-        webview.create_window(
+        window = webview.create_window(
             "TD-markitdown - TobonDigital",
             "http://127.0.0.1:8000",
+            js_api=api,
             width=1220,
             height=850,
             min_size=(950, 700)
         )
+        api.window = window
         webview.start()
         print("Window closed. Exiting application.")
         sys.exit(0)

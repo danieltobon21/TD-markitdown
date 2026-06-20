@@ -14,7 +14,7 @@ def main():
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         
-    python_exe = os.path.join(base_dir, ".venv", "Scripts", "python.exe")
+    python_exe = os.path.join(base_dir, ".venv", "Scripts", "pythonw.exe")
     main_py = os.path.join(base_dir, "backend", "main.py")
     
     if not os.path.exists(python_exe) or not os.path.exists(main_py):
