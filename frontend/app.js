@@ -59,8 +59,8 @@ const translations = {
     es: {
         subtitle: "Convierte tus documentos a Markdown limpio usando Microsoft MarkItDown",
         langLabel: "English",
-        llmTitle: "Configuración Avanzada de LLM (OCR e Imágenes)",
-        enableLlm: "Habilitar LLM (Descripción de Imágenes y PDF Avanzado)",
+        llmTitle: "Ajustes de LLM (OCR e Imágenes)",
+        enableLlm: "Habilitar LLM (Imágenes y PDF)",
         llmProvider: "Proveedor de LLM",
         apiKeyLabel: "Clave de API (API Key)",
         modelNameLabel: "Nombre del Modelo",

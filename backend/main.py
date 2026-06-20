@@ -39,37 +39,67 @@ app.add_middleware(
 dialog_lock = threading.Lock()
 
 def open_file_dialog():
-    with dialog_lock:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        file_paths = filedialog.askopenfilenames(
-            title="Select Files to Convert",
-            filetypes=[
-                ("All Supported Files", "*.pdf;*.docx;*.xlsx;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip"),
-                ("PDF Documents", "*.pdf"),
-                ("Word Documents", "*.docx"),
-                ("Excel Sheets", "*.xlsx;*.xls"),
-                ("PowerPoint Presentations", "*.pptx"),
-                ("Web & Structured", "*.html;*.csv;*.json;*.xml"),
-                ("Images", "*.png;*.jpg;*.jpeg"),
-                ("Audio", "*.mp3;*.wav"),
-                ("Archives", "*.zip"),
-                ("All Files", "*.*")
-            ]
+    if len(webview.windows) > 0:
+        window = webview.windows[0]
+        file_types = (
+            "All Supported Files (*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip)",
+            "PDF Documents (*.pdf)",
+            "Word Documents (*.docx)",
+            "Excel Sheets (*.xlsx;*.xls)",
+            "PowerPoint Presentations (*.pptx)",
+            "Web & Structured (*.html;*.csv;*.json;*.xml)",
+            "Images (*.png;*.jpg;*.jpeg)",
+            "Audio (*.mp3;*.wav)",
+            "Archives (*.zip)",
+            "All Files (*.*)"
         )
-        paths = list(file_paths)
-        root.destroy()
-        return paths
+        res = window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=True,
+            file_types=file_types
+        )
+        return list(res) if res else []
+    else:
+        with dialog_lock:
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            file_paths = filedialog.askopenfilenames(
+                title="Select Files to Convert",
+                filetypes=[
+                    ("All Supported Files", "*.pdf;*.docx;*.xlsx;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip"),
+                    ("PDF Documents", "*.pdf"),
+                    ("Word Documents", "*.docx"),
+                    ("Excel Sheets", "*.xlsx;*.xls"),
+                    ("PowerPoint Presentations", "*.pptx"),
+                    ("Web & Structured", "*.html;*.csv;*.json;*.xml"),
+                    ("Images", "*.png;*.jpg;*.jpeg"),
+                    ("Audio", "*.mp3;*.wav"),
+                    ("Archives", "*.zip"),
+                    ("All Files", "*.*")
+                ]
+            )
+            paths = list(file_paths)
+            root.destroy()
+            return paths
 
 def open_folder_dialog():
-    with dialog_lock:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        folder_path = filedialog.askdirectory(title="Select Output Folder")
-        root.destroy()
-        return folder_path
+    if len(webview.windows) > 0:
+        window = webview.windows[0]
+        res = window.create_file_dialog(webview.FOLDER_DIALOG)
+        if res:
+            if isinstance(res, tuple) or isinstance(res, list):
+                return res[0] if len(res) > 0 else None
+            return res
+        return None
+    else:
+        with dialog_lock:
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            folder_path = filedialog.askdirectory(title="Select Output Folder")
+            root.destroy()
+            return folder_path
 
 class ConvertRequest(BaseModel):
     filepath: str

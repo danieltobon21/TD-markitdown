@@ -848,14 +848,13 @@ select:focus {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background-color: rgba(8, 9, 15, 0.85);
 }
 
 .console-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(27, 54, 93, 0.1);
     padding-bottom: 8px;
 }
 
@@ -901,25 +900,29 @@ select:focus {
     overflow-y: auto;
     font-family: "Consolas", "Courier New", monospace;
     font-size: 0.75rem;
-    color: #e2e8f0;
-    background-color: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    color: #1e293b;
+    background-color: #f1f5f9;
+    border: 1px solid rgba(27, 54, 93, 0.15);
     padding: 8px 12px;
     border-radius: 6px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    user-select: text !important;
+    -webkit-user-select: text !important;
 }
 
 .console-line {
     word-break: break-all;
     line-height: 1.35;
+    user-select: text !important;
+    -webkit-user-select: text !important;
 }
 
-.console-line.system { color: #a855f7; }
-.console-line.success { color: #34d399; }
-.console-line.error { color: #f87171; }
-.console-line.info { color: #38bdf8; }
+.console-line.system { color: #6b21a8; font-weight: 600; }
+.console-line.success { color: #065f46; font-weight: 600; }
+.console-line.error { color: #b91c1c; font-weight: 600; }
+.console-line.info { color: #1d4ed8; }
 
 /* Utilities */
 .hidden {
