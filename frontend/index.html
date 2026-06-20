@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<!-- Easter Egg Check: Developed by dtmadman 2026™ under TobonDigital.com -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TD-markitdown - Premium Document to Markdown Converter</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Link to Stylesheet -->
+    <link rel="stylesheet" href="/frontend/style.css">
+</head>
+<body>
+    <div class="background-decorations">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo-section" id="logo-trigger" style="cursor: pointer;">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#logo-grad)" stroke="#a855f7" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <defs>
+                            <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3b82f6"/>
+                                <stop offset="1" stop-color="#ec4899"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="app-title">TD-markitdown</h1>
+                    <p class="app-subtitle" id="txt-subtitle">Convert your documents to clean Markdown with Microsoft MarkItDown</p>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <a href="https://github.com/microsoft/markitdown" target="_blank" class="credit-badge" title="Original Repository">
+                    <span>Powered by</span>
+                    <span class="highlight">Microsoft MarkItDown</span>
+                </a>
+                <button id="btn-language" class="language-toggle">
+                    <svg class="icon-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <span id="txt-lang-label">Español</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <!-- Left Side: Config & Selector -->
+            <div class="panel-left">
+                <!-- LLM Settings Panel -->
+                <div class="glass-card config-card">
+                    <button class="accordion-header" id="btn-llm-accordion">
+                        <div class="accordion-title">
+                            <svg class="icon-ai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>
+                            </svg>
+                            <span id="txt-llm-title">Advanced LLM Settings (OCR & Images)</span>
+                        </div>
+                        <svg class="icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    
+                    <div class="accordion-content hidden" id="llm-settings-content">
+                        <div class="form-group row-checkbox">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="chk-llm-enabled">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="label-text" id="txt-enable-llm">Enable LLM (Image Description & Advanced PDF)</span>
+                        </div>
+                        
+                        <div class="llm-dependent-fields hidden" id="llm-fields">
+                            <div class="form-group">
+                                <label for="sel-llm-provider" id="txt-llm-provider">LLM Provider</label>
+                                <select id="sel-llm-provider">
+                                    <option value="nvidia">Nvidia NIM (Free Trial API)</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="custom">Custom Endpoint</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="txt-api-key" id="txt-api-key-label">API Key</label>
+                                <div class="password-input-container">
+                                    <input type="password" id="txt-api-key" placeholder="nvapi-...">
+                                    <button class="toggle-password" id="btn-toggle-password" type="button">👁️</button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="txt-model-name" id="txt-model-name-label">Model Name</label>
+                                <input type="text" id="txt-model-name" placeholder="meta/llama-3.2-11b-vision-instruct">
+                            </div>
+
+                            <div class="form-group hidden" id="custom-url-group">
+                                <label for="txt-custom-url" id="txt-custom-url-label">Custom Base URL</label>
+                                <input type="text" id="txt-custom-url" placeholder="https://api.yourprovider.com/v1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Folder Card -->
+                <div class="glass-card config-card">
+                    <h2 class="card-title" id="txt-output-title">Output Location Settings</h2>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="output-mode" value="same_dir" checked>
+                            <span class="radio-text" id="txt-out-same">Save in the same folder as the source files</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="output-mode" value="custom_dir">
+                            <span class="radio-text" id="txt-out-custom">Save in a specific output directory</span>
+                        </label>
+                    </div>
+
+                    <div class="custom-dir-section hidden" id="custom-dir-section">
+                        <div class="path-selector-row">
+                            <input type="text" id="txt-output-path" readonly placeholder="No output folder selected">
+                            <button id="btn-select-folder" class="btn btn-secondary">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                <span id="txt-browse">Browse...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dropzone selector -->
+                <div class="glass-card dropzone-card" id="dropzone">
+                    <div class="dropzone-content">
+                        <div class="drop-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h3 id="txt-drop-title">Drag & Drop Files Here</h3>
+                        <p id="txt-drop-subtitle">Supports PDF, DOCX, XLSX, PPTX, Images, Audio, ZIP and more</p>
+                        <button id="btn-select-files" class="btn btn-primary btn-lg">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span id="txt-choose-files">Choose Files</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Conversion Queue & Log -->
+            <div class="panel-right">
+                <div class="glass-card queue-card">
+                    <div class="queue-header">
+                        <h2 class="card-title">
+                            <span id="txt-queue-title">Conversion Queue</span>
+                            <span class="badge" id="lbl-queue-count">0</span>
+                        </h2>
+                        <button id="btn-clear-queue" class="btn btn-text hidden" id="txt-clear-all">Clear All</button>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div class="empty-queue" id="empty-queue-view">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="48" height="48">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        <p id="txt-empty-msg">No files selected. Add documents to start converting.</p>
+                    </div>
+
+                    <!-- Files Table -->
+                    <div class="table-container hidden" id="queue-table-view">
+                        <table class="queue-table">
+                            <thead>
+                                <tr>
+                                    <th id="txt-col-name">File Name</th>
+                                    <th id="txt-col-size">Size</th>
+                                    <th id="txt-col-status">Status</th>
+                                    <th style="width: 60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="queue-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Actions Footer -->
+                    <div class="queue-footer hidden" id="queue-footer">
+                        <div class="progress-bar-container">
+                            <div class="progress-stats">
+                                <span id="txt-progress-label">Overall Progress</span>
+                                <span id="lbl-progress-percent">0%</span>
+                            </div>
+                            <div class="progress-bar-outer">
+                                <div class="progress-bar-inner" id="progress-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <div class="footer-buttons">
+                            <button id="btn-convert-all" class="btn btn-primary btn-glow btn-lg">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                <span id="txt-convert-btn">Convert Queue</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Output Card -->
+                <div class="glass-card console-card">
+                    <div class="console-header">
+                        <div class="console-title">
+                            <span class="console-dot"></span>
+                            <span id="txt-console-title">Execution Console Log</span>
+                        </div>
+                        <button id="btn-clear-console" class="btn-icon" title="Clear Console">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="console-body" id="console-logs">
+                        <div class="console-line system">[System] TD-markitdown console initialized. Waiting for files.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Easter Egg Modal -->
+    <div id="easter-egg-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-card easter-egg-card">
+            <button id="btn-close-easter-egg" class="btn-close">&times;</button>
+            <div class="easter-egg-header">🤖 DECRYPTING COMPLETED 🤖</div>
+            <div class="easter-egg-body">
+                <h2 class="retro-title">dtmadman 2026™</h2>
+                <p class="retro-subtitle">Product of TobonDigital.com</p>
+                <div class="matrix-effect">
+                    <p>// ACCESS GRANTED</p>
+                    <p>// DEVELOPER: dtmadman</p>
+                    <p>// BRAND: TobonDigital</p>
+                    <p>// DOMAIN: TobonDigital.com</p>
+                    <p>// ENGINE: Microsoft MarkItDown</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/frontend/app.js"></script>
+</body>
+</html>
