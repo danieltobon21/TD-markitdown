@@ -36,7 +36,7 @@ class WebviewApi:
                 "Word Documents (*.docx)",
                 "Excel Sheets (*.xlsx;*.xls)",
                 "PowerPoint Presentations (*.pptx)",
-                "Web & Structured (*.html;*.csv;*.json;*.xml)",
+                "Web and Structured Files (*.html;*.csv;*.json;*.xml)",
                 "Images (*.png;*.jpg;*.jpeg)",
                 "Audio (*.mp3;*.wav)",
                 "Archives (*.zip)",
@@ -434,6 +434,31 @@ def open_browser():
 def start_server():
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
 
+def is_port_open(host, port):
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.1)
+            s.connect((host, port))
+            return True
+    except Exception:
+        return False
+
+def start_server_and_wait(window):
+    # Start FastAPI server in a background daemon thread
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+    
+    # Poll until server is ready (timeout after 12 seconds)
+    for _ in range(60):
+        if is_port_open("127.0.0.1", 8000):
+            break
+        time.sleep(0.2)
+        
+    # Redirect window from splash.html to the main FastAPI web app
+    time.sleep(0.5)  # Extra brief buffer for complete app load
+    window.load_url("http://127.0.0.1:8000")
+
 if __name__ == "__main__":
     if "--no-gui" in sys.argv:
         # Start browser-opening thread
@@ -441,26 +466,26 @@ if __name__ == "__main__":
         # Run uvicorn server in main thread
         start_server()
     else:
-        # Start FastAPI server in a daemon thread
-        server_thread = threading.Thread(target=start_server, daemon=True)
-        server_thread.start()
-        
-        # Wait for the server to be ready
-        time.sleep(1.2)
-        
         # Create WebviewApi instance
         api = WebviewApi()
         
-        # Create webview window pointing to local FastAPI server
+        # Local splash screen file path
+        splash_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "splash.html"))
+        
+        # Create webview window pointing to local splash
         window = webview.create_window(
             "TD-markitdown - TobonDigital",
-            "http://127.0.0.1:8000",
+            splash_path,
             js_api=api,
             width=1220,
             height=850,
             min_size=(950, 700)
         )
         api.window = window
+        
+        # Start server in a background thread and pass window to redirect once ready
+        threading.Thread(target=start_server_and_wait, args=(window,), daemon=True).start()
+        
         webview.start()
         print("Window closed. Exiting application.")
         sys.exit(0)
