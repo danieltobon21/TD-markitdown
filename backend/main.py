@@ -455,21 +455,26 @@ if __name__ == "__main__":
             # Start FastAPI in background daemon thread (exits when main thread exits)
             server_thread = threading.Thread(target=start_server, daemon=True)
             server_thread.start()
+            # No waiting here — loading.html polls the backend and redirects when ready
 
-            # Wait for server to be ready (max ~5 seconds)
-            for _ in range(50):
-                if is_port_open("127.0.0.1", 8000):
-                    break
-                time.sleep(0.1)
-
-        # Launch Microsoft Edge in App Mode (app window, no browser chrome)
         edge_path = find_edge()
 
         if edge_path:
+            # Open the local loading page immediately (no server needed for this page)
+            # loading.html polls http://127.0.0.1:8000 and redirects once the server is up
+            loading_page = os.path.join(frontend_dir, "loading.html")
+            if os.path.exists(loading_page):
+                # Convert Windows path to file:/// URL
+                loading_url = "file:///" + loading_page.replace("\\", "/").replace(" ", "%20")
+                start_url = f"--app={loading_url}"
+            else:
+                # Fallback: point directly to the server (may show brief ERR if server not ready yet)
+                start_url = "--app=http://127.0.0.1:8000"
+
             proc = subprocess.Popen(
                 [
                     edge_path,
-                    "--app=http://127.0.0.1:8000",
+                    start_url,
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-extensions",
@@ -479,10 +484,13 @@ if __name__ == "__main__":
             )
             proc.wait()  # Block main thread until Edge app window is closed
         else:
-            # Fallback: default system browser
+            # Fallback: wait for server then open in default browser
+            for _ in range(300):
+                if is_port_open("127.0.0.1", 8000):
+                    break
+                time.sleep(0.1)
             import webbrowser
             webbrowser.open("http://127.0.0.1:8000")
-            # Keep server alive until user terminates
             try:
                 while True:
                     time.sleep(1)
