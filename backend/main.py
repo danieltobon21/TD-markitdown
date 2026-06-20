@@ -426,6 +426,17 @@ if __name__ == "__main__":
         # Run uvicorn server in main thread
         start_server()
     else:
+        # Initialize CLR on the main GUI thread before starting event loop
+        # to prevent thread-safety/GIL deadlocks in pythonnet
+        clr_available = False
+        try:
+            import clr
+            clr.AddReference('System.Drawing')
+            import System.Drawing
+            clr_available = True
+        except Exception as e:
+            print("[Warning] Failed to initialize .NET CLR on main thread:", e)
+
         import webview
         
         # Start FastAPI server in a background daemon thread
@@ -451,17 +462,15 @@ if __name__ == "__main__":
         api.window = window
         
         def set_window_icon():
-            try:
-                import clr
-                clr.AddReference('System.Drawing')
-                import System.Drawing
-                
-                icon_path = os.path.join(base_dir, "frontend", "logo_t.ico")
-                if os.path.exists(icon_path):
-                    window.native.Icon = System.Drawing.Icon(icon_path)
-                    print("[System] Native window icon loaded successfully.")
-            except Exception as e:
-                print("[Warning] Failed to set native window icon:", e)
+            if clr_available:
+                try:
+                    import System.Drawing
+                    icon_path = os.path.join(base_dir, "frontend", "logo_t.ico")
+                    if os.path.exists(icon_path):
+                        window.native.Icon = System.Drawing.Icon(icon_path)
+                        print("[System] Native window icon loaded successfully.")
+                except Exception as e:
+                    print("[Warning] Failed to set native window icon:", e)
 
         webview.start(set_window_icon)
         print("Window closed. Exiting application.")
