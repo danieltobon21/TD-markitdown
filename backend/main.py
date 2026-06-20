@@ -22,8 +22,8 @@ if getattr(sys, 'frozen', False):
 
 import subprocess
 import threading
-import webbrowser
 import time
+import socket
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -31,46 +31,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
-
-
-class WebviewApi:
-    def __init__(self):
-        self.window = None
-
-    def select_files(self):
-        import webview
-        if self.window:
-            file_types = (
-                "All Supported Files (*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip)",
-                "PDF Documents (*.pdf)",
-                "Word Documents (*.docx)",
-                "Excel Sheets (*.xlsx;*.xls)",
-                "PowerPoint Presentations (*.pptx)",
-                "Web and Structured Files (*.html;*.csv;*.json;*.xml)",
-                "Images (*.png;*.jpg;*.jpeg)",
-                "Audio (*.mp3;*.wav)",
-                "Archives (*.zip)",
-                "All Files (*.*)"
-            )
-            res = self.window.create_file_dialog(
-                webview.OPEN_DIALOG,
-                allow_multiple=True,
-                file_types=file_types
-            )
-            return list(res) if res else []
-        return []
-
-    def select_folder(self):
-        import webview
-        if self.window:
-            res = self.window.create_file_dialog(webview.FOLDER_DIALOG)
-            if res:
-                if isinstance(res, tuple) or isinstance(res, list):
-                    return res[0] if len(res) > 0 else None
-                return res
-            return None
-        return None
-
 
 
 app = FastAPI(title="TD-markitdown Backend")
@@ -87,42 +47,73 @@ app.add_middleware(
 # Threading lock for native dialogs to prevent multiple dialogs opening at once
 dialog_lock = threading.Lock()
 
+
 def open_file_dialog():
-    import tkinter as tk
-    from tkinter import filedialog
+    """
+    Open a native Windows file selection dialog using PowerShell.
+    Works safely from any thread (no tkinter STA/COM restrictions).
+    """
     with dialog_lock:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        file_paths = filedialog.askopenfilenames(
-            title="Select Files to Convert",
-            filetypes=[
-                ("All Supported Files", "*.pdf;*.docx;*.xlsx;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip"),
-                ("PDF Documents", "*.pdf"),
-                ("Word Documents", "*.docx"),
-                ("Excel Sheets", "*.xlsx;*.xls"),
-                ("PowerPoint Presentations", "*.pptx"),
-                ("Web and Structured Files", "*.html;*.csv;*.json;*.xml"),
-                ("Images", "*.png;*.jpg;*.jpeg"),
-                ("Audio", "*.mp3;*.wav"),
-                ("Archives", "*.zip"),
-                ("All Files", "*.*")
-            ]
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
+            "$d.Multiselect = $true; "
+            "$d.Title = 'Select Files to Convert'; "
+            "$d.Filter = 'All Supported Files|*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip|"
+            "PDF Documents|*.pdf|"
+            "Word Documents|*.docx|"
+            "Excel Sheets|*.xlsx;*.xls|"
+            "PowerPoint|*.pptx|"
+            "Web and Structured|*.html;*.csv;*.json;*.xml|"
+            "Images|*.png;*.jpg;*.jpeg|"
+            "Audio|*.mp3;*.wav|"
+            "Archives|*.zip|"
+            "All Files|*.*'; "
+            "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileNames -join '|' }"
         )
-        paths = list(file_paths)
-        root.destroy()
-        return paths
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                paths = [p.strip() for p in result.stdout.strip().split("|") if p.strip()]
+                return paths
+        except Exception as e:
+            print(f"[Warning] File dialog error: {e}")
+    return []
+
 
 def open_folder_dialog():
-    import tkinter as tk
-    from tkinter import filedialog
+    """
+    Open a native Windows folder selection dialog using PowerShell.
+    Works safely from any thread.
+    """
     with dialog_lock:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        folder_path = filedialog.askdirectory(title="Select Output Folder")
-        root.destroy()
-        return folder_path
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+            "$d.Description = 'Select Output Folder'; "
+            "$d.ShowNewFolderButton = $true; "
+            "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception as e:
+            print(f"[Warning] Folder dialog error: {e}")
+    return None
+
 
 class ConvertRequest(BaseModel):
     filepath: str
@@ -134,8 +125,10 @@ class ConvertRequest(BaseModel):
     llm_model: Optional[str] = None
     llm_base_url: Optional[str] = None
 
+
 class MetadataRequest(BaseModel):
     paths: List[str]
+
 
 @app.post("/api/file-metadata")
 def get_file_metadata(req: MetadataRequest):
@@ -151,10 +144,11 @@ def get_file_metadata(req: MetadataRequest):
             })
     return {"files": files_metadata}
 
+
 @app.get("/")
 def read_root():
-    # Serve index.html from frontend folder
-    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html"))
+    return FileResponse(os.path.join(base_dir, "frontend", "index.html"))
+
 
 @app.get("/api/select-files")
 def select_files():
@@ -176,6 +170,7 @@ def select_files():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/select-folder")
 def select_folder():
     try:
@@ -185,6 +180,7 @@ def select_folder():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/open-file")
 def open_file(path: str):
@@ -196,28 +192,27 @@ def open_file(path: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/open-folder")
 def open_folder(path: str):
-    import subprocess
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     try:
-        # Highlight file in explorer
         subprocess.run(['explorer', '/select,', os.path.normpath(path)])
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/convert-file")
 def convert_file(req: ConvertRequest):
     if not os.path.exists(req.filepath):
         raise HTTPException(status_code=400, detail="Source file does not exist")
-    
-    # 1. Determine output file path
+
     filename = os.path.basename(req.filepath)
     name, _ = os.path.splitext(filename)
     output_filename = f"{name}.md"
-    
+
     if req.output_mode == "same_dir":
         output_dir = os.path.dirname(req.filepath)
     elif req.output_mode == "custom_dir":
@@ -231,23 +226,22 @@ def convert_file(req: ConvertRequest):
                 raise HTTPException(status_code=400, detail=f"Cannot create output directory: {str(e)}")
     else:
         raise HTTPException(status_code=400, detail="Invalid output mode")
-        
+
     output_filepath = os.path.join(output_dir, output_filename)
-    
-    # 2. Configure MarkItDown with optional LLM
+
     try:
         from markitdown import MarkItDown
         from openai import OpenAI
-        
+
         llm_client = None
         llm_model = None
-        
+
         if req.llm_enabled and req.llm_api_key:
             api_key = req.llm_api_key
             model = req.llm_model or "gpt-4o"
             base_url = None
             default_headers = None
-            
+
             if req.llm_provider == "nvidia":
                 base_url = "https://integrate.api.nvidia.com/v1"
                 model = req.llm_model or "meta/llama-3.2-11b-vision-instruct"
@@ -260,23 +254,16 @@ def convert_file(req: ConvertRequest):
                 }
             elif req.llm_provider == "custom" and req.llm_base_url:
                 base_url = req.llm_base_url
-            
+
             llm_client = OpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers)
             llm_model = model
-            
-        # Initialize MarkItDown
-        if llm_client:
-            md = MarkItDown(llm_client=llm_client, llm_model=llm_model)
-        else:
-            md = MarkItDown()
-            
-        # Perform conversion
+
+        md = MarkItDown(llm_client=llm_client, llm_model=llm_model) if llm_client else MarkItDown()
         result = md.convert(req.filepath)
-        
-        # Write output file
+
         with open(output_filepath, "w", encoding="utf-8") as f:
             f.write(result.text_content)
-            
+
         return {
             "success": True,
             "output_path": output_filepath,
@@ -288,9 +275,11 @@ def convert_file(req: ConvertRequest):
         print(error_details)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 import json
 
 CONFIG_PATH = os.path.join(base_dir, "backend", "config.json")
+
 
 def load_config():
     if os.path.exists(CONFIG_PATH):
@@ -301,6 +290,7 @@ def load_config():
             return {}
     return {}
 
+
 def save_config(config_data):
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -308,6 +298,7 @@ def save_config(config_data):
         return True
     except Exception:
         return False
+
 
 class SettingsModel(BaseModel):
     llm_enabled: bool
@@ -318,15 +309,18 @@ class SettingsModel(BaseModel):
     output_mode: str
     output_dir: str
 
+
 class TestLLMRequest(BaseModel):
     llm_provider: str
     llm_api_key: str
     llm_model: str
     llm_base_url: Optional[str] = None
 
+
 @app.get("/api/settings")
 def get_settings():
     return load_config()
+
 
 @app.post("/api/settings")
 def save_settings_endpoint(settings: SettingsModel):
@@ -334,6 +328,7 @@ def save_settings_endpoint(settings: SettingsModel):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save settings")
     return {"success": True}
+
 
 @app.post("/api/test-llm")
 def test_llm_connection(req: TestLLMRequest):
@@ -373,6 +368,7 @@ def test_llm_connection(req: TestLLMRequest):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/system-info")
 def get_system_info():
     import importlib.metadata
@@ -385,6 +381,7 @@ def get_system_info():
         "markitdown_version": md_version,
         "python_version": python_version
     }
+
 
 @app.post("/api/update-core")
 def update_core():
@@ -411,59 +408,85 @@ def update_core():
             yield f"\n[System] Error during update: {str(e)}\n"
     return StreamingResponse(generate(), media_type="text/plain")
 
+
 # Mount static frontend assets
 frontend_dir = os.path.abspath(os.path.join(base_dir, "frontend"))
 app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
 
-def open_browser():
-    # Wait a moment for uvicorn to bind to port
-    time.sleep(1.5)
-    webbrowser.open("http://127.0.0.1:8000")
 
-def start_server():
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
-
-def is_port_open(host, port):
-    import socket
+def is_port_open(host, port, timeout=0.1):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.1)
+            s.settimeout(timeout)
             s.connect((host, port))
             return True
     except Exception:
         return False
 
+
+def start_server():
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_level="error")
+
+
+def find_edge():
+    """Locate Microsoft Edge executable on Windows."""
+    candidates = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 if __name__ == "__main__":
     if "--no-gui" in sys.argv:
-        # Start browser-opening thread
-        threading.Thread(target=open_browser, daemon=True).start()
-        # Run uvicorn server in main thread
-        start_server()
+        # Headless server mode (for development / run.bat)
+        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
     else:
-        import webview
-        
-        # Start FastAPI server in a background daemon thread
-        server_thread = threading.Thread(target=start_server, daemon=True)
-        server_thread.start()
-        
-        # Determine the local index.html file path
-        index_path = os.path.join(frontend_dir, "index.html")
-        
-        # Create WebviewApi instance
-        api = WebviewApi()
-        
-        # Create webview window pointing directly to the local index.html file
-        window = webview.create_window(
-            "TD-markitdown - TobonDigital",
-            index_path,
-            js_api=api,
-            width=1220,
-            height=850,
-            min_size=(950, 700)
-        )
-        api.window = window
+        # --- GUI Mode: Edge App Window ---
 
-        webview.start()
-        print("Window closed. Exiting application.")
+        # Check if server is already running on port 8000 (handles double-launch)
+        server_already_running = is_port_open("127.0.0.1", 8000)
+
+        if not server_already_running:
+            # Start FastAPI in background daemon thread (exits when main thread exits)
+            server_thread = threading.Thread(target=start_server, daemon=True)
+            server_thread.start()
+
+            # Wait for server to be ready (max ~5 seconds)
+            for _ in range(50):
+                if is_port_open("127.0.0.1", 8000):
+                    break
+                time.sleep(0.1)
+
+        # Launch Microsoft Edge in App Mode (app window, no browser chrome)
+        edge_path = find_edge()
+
+        if edge_path:
+            proc = subprocess.Popen(
+                [
+                    edge_path,
+                    "--app=http://127.0.0.1:8000",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-extensions",
+                    "--new-window",
+                ],
+                creationflags=0x08000000  # CREATE_NO_WINDOW for the Edge launcher process
+            )
+            proc.wait()  # Block main thread until Edge app window is closed
+        else:
+            # Fallback: default system browser
+            import webbrowser
+            webbrowser.open("http://127.0.0.1:8000")
+            # Keep server alive until user terminates
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
+
         sys.exit(0)
-
