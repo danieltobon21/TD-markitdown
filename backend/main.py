@@ -421,7 +421,7 @@ def open_browser():
     webbrowser.open("http://127.0.0.1:8000")
 
 def start_server():
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
 
 def is_port_open(host, port):
     import socket
