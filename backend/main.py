@@ -7,8 +7,6 @@
 import os
 import sys
 import subprocess
-import tkinter as tk
-from tkinter import filedialog
 import threading
 import webbrowser
 import time
@@ -19,9 +17,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
-from markitdown import MarkItDown
-from openai import OpenAI
-import webview
 
 
 class WebviewApi:
@@ -29,6 +24,7 @@ class WebviewApi:
         self.window = None
 
     def select_files(self):
+        import webview
         if self.window:
             file_types = (
                 "All Supported Files (*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip)",
@@ -51,6 +47,7 @@ class WebviewApi:
         return []
 
     def select_folder(self):
+        import webview
         if self.window:
             res = self.window.create_file_dialog(webview.FOLDER_DIALOG)
             if res:
@@ -77,67 +74,41 @@ app.add_middleware(
 dialog_lock = threading.Lock()
 
 def open_file_dialog():
-    if len(webview.windows) > 0:
-        window = webview.windows[0]
-        file_types = (
-            "All Supported Files (*.pdf;*.docx;*.xlsx;*.xls;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip)",
-            "PDF Documents (*.pdf)",
-            "Word Documents (*.docx)",
-            "Excel Sheets (*.xlsx;*.xls)",
-            "PowerPoint Presentations (*.pptx)",
-            "Web & Structured (*.html;*.csv;*.json;*.xml)",
-            "Images (*.png;*.jpg;*.jpeg)",
-            "Audio (*.mp3;*.wav)",
-            "Archives (*.zip)",
-            "All Files (*.*)"
+    import tkinter as tk
+    from tkinter import filedialog
+    with dialog_lock:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        file_paths = filedialog.askopenfilenames(
+            title="Select Files to Convert",
+            filetypes=[
+                ("All Supported Files", "*.pdf;*.docx;*.xlsx;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip"),
+                ("PDF Documents", "*.pdf"),
+                ("Word Documents", "*.docx"),
+                ("Excel Sheets", "*.xlsx;*.xls"),
+                ("PowerPoint Presentations", "*.pptx"),
+                ("Web and Structured Files", "*.html;*.csv;*.json;*.xml"),
+                ("Images", "*.png;*.jpg;*.jpeg"),
+                ("Audio", "*.mp3;*.wav"),
+                ("Archives", "*.zip"),
+                ("All Files", "*.*")
+            ]
         )
-        res = window.create_file_dialog(
-            webview.OPEN_DIALOG,
-            allow_multiple=True,
-            file_types=file_types
-        )
-        return list(res) if res else []
-    else:
-        with dialog_lock:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes('-topmost', True)
-            file_paths = filedialog.askopenfilenames(
-                title="Select Files to Convert",
-                filetypes=[
-                    ("All Supported Files", "*.pdf;*.docx;*.xlsx;*.pptx;*.html;*.csv;*.json;*.xml;*.png;*.jpg;*.jpeg;*.mp3;*.wav;*.zip"),
-                    ("PDF Documents", "*.pdf"),
-                    ("Word Documents", "*.docx"),
-                    ("Excel Sheets", "*.xlsx;*.xls"),
-                    ("PowerPoint Presentations", "*.pptx"),
-                    ("Web & Structured", "*.html;*.csv;*.json;*.xml"),
-                    ("Images", "*.png;*.jpg;*.jpeg"),
-                    ("Audio", "*.mp3;*.wav"),
-                    ("Archives", "*.zip"),
-                    ("All Files", "*.*")
-                ]
-            )
-            paths = list(file_paths)
-            root.destroy()
-            return paths
+        paths = list(file_paths)
+        root.destroy()
+        return paths
 
 def open_folder_dialog():
-    if len(webview.windows) > 0:
-        window = webview.windows[0]
-        res = window.create_file_dialog(webview.FOLDER_DIALOG)
-        if res:
-            if isinstance(res, tuple) or isinstance(res, list):
-                return res[0] if len(res) > 0 else None
-            return res
-        return None
-    else:
-        with dialog_lock:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes('-topmost', True)
-            folder_path = filedialog.askdirectory(title="Select Output Folder")
-            root.destroy()
-            return folder_path
+    import tkinter as tk
+    from tkinter import filedialog
+    with dialog_lock:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        folder_path = filedialog.askdirectory(title="Select Output Folder")
+        root.destroy()
+        return folder_path
 
 class ConvertRequest(BaseModel):
     filepath: str
@@ -251,6 +222,9 @@ def convert_file(req: ConvertRequest):
     
     # 2. Configure MarkItDown with optional LLM
     try:
+        from markitdown import MarkItDown
+        from openai import OpenAI
+        
         llm_client = None
         llm_model = None
         
@@ -368,6 +342,7 @@ def test_llm_connection(req: TestLLMRequest):
     elif req.llm_provider == "custom" and req.llm_base_url:
         base_url = req.llm_base_url
     try:
+        from openai import OpenAI
         client = OpenAI(api_key=api_key, base_url=base_url, default_headers=default_headers, timeout=10.0)
         response = client.chat.completions.create(
             model=model,
@@ -444,21 +419,6 @@ def is_port_open(host, port):
     except Exception:
         return False
 
-def start_server_and_wait(window):
-    # Start FastAPI server in a background daemon thread
-    server_thread = threading.Thread(target=start_server, daemon=True)
-    server_thread.start()
-    
-    # Poll until server is ready (timeout after 12 seconds)
-    for _ in range(60):
-        if is_port_open("127.0.0.1", 8000):
-            break
-        time.sleep(0.2)
-        
-    # Redirect window from splash.html to the main FastAPI web app
-    time.sleep(0.5)  # Extra brief buffer for complete app load
-    window.load_url("http://127.0.0.1:8000")
-
 if __name__ == "__main__":
     if "--no-gui" in sys.argv:
         # Start browser-opening thread
@@ -466,16 +426,23 @@ if __name__ == "__main__":
         # Run uvicorn server in main thread
         start_server()
     else:
+        import webview
+        
+        # Start FastAPI server in a background daemon thread
+        server_thread = threading.Thread(target=start_server, daemon=True)
+        server_thread.start()
+        
+        # Determine the local index.html file path
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        index_path = os.path.join(base_dir, "frontend", "index.html")
+        
         # Create WebviewApi instance
         api = WebviewApi()
         
-        # Local splash screen file path
-        splash_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "splash.html"))
-        
-        # Create webview window pointing to local splash
+        # Create webview window pointing directly to the local index.html file
         window = webview.create_window(
             "TD-markitdown - TobonDigital",
-            splash_path,
+            index_path,
             js_api=api,
             width=1220,
             height=850,
@@ -483,10 +450,20 @@ if __name__ == "__main__":
         )
         api.window = window
         
-        # Start server in a background thread and pass window to redirect once ready
-        threading.Thread(target=start_server_and_wait, args=(window,), daemon=True).start()
-        
-        webview.start()
+        def set_window_icon():
+            try:
+                import clr
+                clr.AddReference('System.Drawing')
+                import System.Drawing
+                
+                icon_path = os.path.join(base_dir, "frontend", "logo_t.ico")
+                if os.path.exists(icon_path):
+                    window.native.Icon = System.Drawing.Icon(icon_path)
+                    print("[System] Native window icon loaded successfully.")
+            except Exception as e:
+                print("[Warning] Failed to set native window icon:", e)
+
+        webview.start(set_window_icon)
         print("Window closed. Exiting application.")
         sys.exit(0)
 

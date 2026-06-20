@@ -117,6 +117,33 @@ let state = {
     isConverting: false
 };
 
+// Helper to prefix endpoints when running under local file:// protocol
+function getApiUrl(endpoint) {
+    const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+    return base + endpoint;
+}
+
+// Poll the backend API until it is available, then load initial app data
+async function initializeBackendConnection() {
+    const maxAttempts = 120; // 120 attempts * 100ms = 12 seconds maximum wait
+    const delay = 100;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await fetch(getApiUrl('/api/settings'));
+            if (response.ok) {
+                // Backend is ready!
+                await Promise.all([loadSettings(), loadSystemInfo()]);
+                return true;
+            }
+        } catch (e) {
+            // Server not ready yet
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    logToConsole("[Error] Failed to connect to the backend server. Please restart the app.", "error");
+    return false;
+}
+
 // DOM Elements
 const elements = {
     btnLanguage: document.getElementById('btn-language'),
@@ -186,11 +213,22 @@ const elements = {
 };
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
-    loadSettings();
-    applyLanguage();
+document.addEventListener('DOMContentLoaded', async () => {
+    applyLanguage(); // Apply language strings immediately
     setupEventListeners();
-    loadSystemInfo();
+    
+    try {
+        await initializeBackendConnection();
+    } catch (e) {
+        console.error("Initialization error:", e);
+    } finally {
+        // Fade out and remove the integrated splash screen overlay
+        const splash = document.getElementById('app-splash-screen');
+        if (splash) {
+            splash.classList.add('fade-out');
+            setTimeout(() => splash.remove(), 400);
+        }
+    }
 });
 
 // Load Settings from Backend API
@@ -199,7 +237,7 @@ async function loadSettings() {
     applyLanguage(); // Apply language strings immediately
 
     try {
-        const response = await fetch('/api/settings');
+        const response = await fetch(getApiUrl('/api/settings'));
         if (response.ok) {
             const config = await response.json();
             
@@ -253,7 +291,7 @@ async function saveSettings() {
     };
     
     try {
-        await fetch('/api/settings', {
+        await fetch(getApiUrl('/api/settings'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
@@ -510,7 +548,7 @@ async function selectOutputFolder() {
         if (window.pywebview && window.pywebview.api) {
             folder = await window.pywebview.api.select_folder();
         } else {
-            const response = await fetch('/api/select-folder');
+            const response = await fetch(getApiUrl('/api/select-folder'));
             const data = await response.json();
             folder = data.folder;
         }
@@ -539,14 +577,14 @@ async function selectFilesFromSystem() {
         if (window.pywebview && window.pywebview.api) {
             paths = await window.pywebview.api.select_files();
         } else {
-            const response = await fetch('/api/select-files');
+            const response = await fetch(getApiUrl('/api/select-files'));
             const data = await response.json();
             paths = data.files ? data.files.map(f => f.path) : [];
         }
         
         if (paths && paths.length > 0) {
             // Retrieve metadata from backend for the selected files
-            const response = await fetch('/api/file-metadata', {
+            const response = await fetch(getApiUrl('/api/file-metadata'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paths: paths })
@@ -771,7 +809,7 @@ async function startQueueConversion() {
                 llm_base_url: llmBaseUrl
             };
 
-            const response = await fetch('/api/convert-file', {
+            const response = await fetch(getApiUrl('/api/convert-file'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqBody)
@@ -842,7 +880,7 @@ function showEasterEgg() {
 window.openResultFile = async function(event, path) {
     if (event) event.stopPropagation();
     try {
-        await fetch(`/api/open-file?path=${encodeURIComponent(path)}`);
+        await fetch(getApiUrl(`/api/open-file?path=${encodeURIComponent(path)}`));
     } catch (err) {
         logToConsole(`Error opening file: ${err.message}`, 'error');
     }
@@ -851,7 +889,7 @@ window.openResultFile = async function(event, path) {
 window.openResultFolder = async function(event, path) {
     if (event) event.stopPropagation();
     try {
-        await fetch(`/api/open-folder?path=${encodeURIComponent(path)}`);
+        await fetch(getApiUrl(`/api/open-folder?path=${encodeURIComponent(path)}`));
     } catch (err) {
         logToConsole(`Error opening folder: ${err.message}`, 'error');
     }
@@ -878,7 +916,7 @@ async function testLLMConnection() {
     logToConsole(state.lang === 'en' ? `[System] Testing connection to ${provider}...` : `[Sistema] Probando conexión con ${provider}...`, 'info');
     
     try {
-        const response = await fetch('/api/test-llm', {
+        const response = await fetch(getApiUrl('/api/test-llm'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -910,7 +948,7 @@ async function testLLMConnection() {
 // Fetch Python and MarkItDown version info
 async function loadSystemInfo() {
     try {
-        const response = await fetch('/api/system-info');
+        const response = await fetch(getApiUrl('/api/system-info'));
         if (response.ok) {
             const data = await response.json();
             if (elements.lblPythonVer) elements.lblPythonVer.textContent = data.python_version || 'Unknown';
@@ -933,7 +971,7 @@ async function updateCoreLibrary() {
     logToConsole(getTranslation('logUpdateStart'), 'system');
     
     try {
-        const response = await fetch('/api/update-core', { method: 'POST' });
+        const response = await fetch(getApiUrl('/api/update-core'), { method: 'POST' });
         
         if (!response.ok) {
             throw new Error(`Server returned status ${response.status}`);
