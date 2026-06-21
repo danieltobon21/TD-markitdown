@@ -39,27 +39,14 @@ TD-markitdown includes a self-bootstrapping process that sets up all dependencie
 
 ### Running the App
 1. Clone or download this repository to your machine.
-2. Double-click the compiled **`TD-markitdown.exe`** launcher in the root folder.
-3. The application will start silently (no command prompt window shown) and launch a native desktop application window.
-4. *Alternative*: You can also run the app by running `run.bat` (or typing `.\run.bat` in a terminal).
+2. Double-click the **`run.bat`** launcher script.
+3. The command prompt window will open, start the local server, and automatically launch the application in your default web browser at `http://127.0.0.1:8000`.
+4. Keep the command prompt window open while using the application. To stop the server, press `Ctrl+C` or close the command prompt window.
 
 ### Checking & Updating MarkItDown
-At the bottom of the desktop application window, you will see a system status footer displaying the active Python version and the currently installed version of the core `markitdown` library.
+At the bottom of the application window, you will see a system status footer displaying the active Python version and the currently installed version of the core `markitdown` library.
 * Whenever Microsoft publishes updates or modifications, click the **"Update Core"** button in the footer.
 * The application will run `pip install --upgrade markitdown[all]` asynchronously, stream the installation log in real-time to the console, and refresh the version once completed.
-
-### Compiling the Launcher Executable
-If you ever want to re-compile the launcher binary `TD-markitdown.exe` yourself:
-1. Open PowerShell in the project directory.
-2. Activate the virtual environment and install pyinstaller:
-   ```powershell
-   .\.venv\Scripts\pip.exe install pyinstaller
-   ```
-3. Run the compilation command:
-   ```powershell
-   .\.venv\Scripts\pyinstaller.exe --onefile --noconsole --icon=frontend/logo_t.png --name=TD-markitdown launcher.py
-   ```
-4. The new executable will be available inside the `dist/` directory. Move it to the root folder of the project.
 
 ---
 

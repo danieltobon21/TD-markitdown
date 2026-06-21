@@ -39,27 +39,14 @@ TD-markitdown incluye un proceso autoejecutable que instala las dependencias de 
 
 ### Ejecución de la Aplicación
 1. Clona o descarga este repositorio en tu equipo.
-2. Haz doble clic en el lanzador compilado **`TD-markitdown.exe`** en la carpeta raíz.
-3. La aplicación se iniciará de forma silenciosa (sin mostrar la ventana negra de la terminal) y abrirá una ventana de aplicación de escritorio nativa.
-4. *Alternativa*: También puedes ejecutar la aplicación haciendo doble clic en `run.bat` (o ejecutando `.\run.bat` en una terminal).
+2. Haz doble clic en el archivo lanzador **`run.bat`**.
+3. Se abrirá la ventana de comando, iniciará el servidor web local y abrirá automáticamente la aplicación en tu navegador web predeterminado en `http://127.0.0.1:8000`.
+4. Mantén la ventana de comandos abierta mientras usas la aplicación. Para detener el servidor, presiona `Ctrl+C` o simplemente cierra la ventana.
 
 ### Comprobar y Actualizar MarkItDown
-En la parte inferior de la ventana de escritorio, verás un pie de página de estado del sistema que muestra la versión activa de Python y la versión actual de la biblioteca principal `markitdown`.
+En la parte inferior de la ventana, verás un pie de página de estado del sistema que muestra la versión activa de Python y la versión actual de la biblioteca principal `markitdown`.
 * Cada vez que Microsoft publique nuevas versiones o modificaciones, haz clic en el botón **"Actualizar Núcleo"** en el pie de página.
 * La aplicación ejecutará `pip install --upgrade markitdown[all]` de forma asíncrona, transmitirá el log de instalación en tiempo real a la consola y actualizará el número de versión una vez completado.
-
-### Compilar el Ejecutable Lanzador
-Si en algún momento deseas volver a compilar el binario del lanzador `TD-markitdown.exe` por ti mismo:
-1. Abre PowerShell en el directorio del proyecto.
-2. Activa el entorno virtual e instala pyinstaller:
-   ```powershell
-   .\.venv\Scripts\pip.exe install pyinstaller
-   ```
-3. Ejecuta el comando de compilación:
-   ```powershell
-   .\.venv\Scripts\pyinstaller.exe --onefile --noconsole --icon=frontend/logo_t.png --name=TD-markitdown launcher.py
-   ```
-4. El nuevo ejecutable estará disponible dentro de la carpeta `dist/`. Muévelo a la carpeta raíz del proyecto.
 
 ---
 
