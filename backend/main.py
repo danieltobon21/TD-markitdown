@@ -37,12 +37,9 @@ import uvicorn
 
 app = FastAPI(title="TD-markitdown Backend")
 
-# Allow CORS for local development
-# Note: allow_origins=["*"] does NOT match the 'null' origin produced by file:// pages.
-# We also explicitly list 'null' and the loading server origin to ensure compatibility.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "null", "http://127.0.0.1:8001"],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -275,8 +272,7 @@ def convert_file(req: ConvertRequest):
         }
     except Exception as e:
         import traceback
-        error_details = traceback.format_exc()
-        print(error_details)
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -380,10 +376,9 @@ def get_system_info():
         md_version = importlib.metadata.version("markitdown")
     except Exception:
         md_version = "Unknown"
-    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return {
         "markitdown_version": md_version,
-        "python_version": python_version
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     }
 
 
@@ -431,6 +426,7 @@ def is_port_open(host, port, timeout=0.1):
 # Simple file-based logger for diagnosing frozen exe startup issues
 _log_path = os.path.join(base_dir, "app_debug.log")
 
+
 def _log(msg):
     try:
         ts = time.strftime("%H:%M:%S")
@@ -452,23 +448,6 @@ def start_server():
         _log(f"[SERVER] CRASH: {e}")
         import traceback
         _log(traceback.format_exc())
-
-
-def start_loading_server():
-    """Serve the frontend/ directory on port 8001 so loading.html can fetch
-    http://127.0.0.1:8000 without hitting file:// CORS restrictions."""
-    class _Handler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=frontend_dir, **kwargs)
-        def log_message(self, *args):
-            pass  # Suppress output
-    try:
-        with socketserver.TCPServer(("127.0.0.1", 8001), _Handler) as srv:
-            srv.allow_reuse_address = True
-            _log("[LOADING SERVER] Serving on port 8001")
-            srv.serve_forever()
-    except Exception as e:
-        _log(f"[LOADING SERVER] Failed to start: {e}")
 
 
 def find_edge():
@@ -494,61 +473,49 @@ if __name__ == "__main__":
 
     if "--no-gui" in sys.argv:
         # Headless server mode (for development / run.bat)
-        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
+        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_config=None)
     else:
         # --- GUI Mode: Edge App Window ---
 
-        # Check if server is already running on port 8000 (handles double-launch)
         server_already_running = is_port_open("127.0.0.1", 8000)
         _log(f"Server already on 8000: {server_already_running}")
 
         if not server_already_running:
-            # Start FastAPI server (daemon — exits when main thread exits)
             _log("Starting FastAPI server thread...")
             server_thread = threading.Thread(target=start_server, daemon=True)
             server_thread.start()
 
-        # Start the loading HTTP server on port 8001 (serves frontend/ over http://)
-        # This avoids the file:// → http:// CORS block in Edge
-        loading_server_ok = False
-        if not is_port_open("127.0.0.1", 8001):
-            _log("Starting loading server thread on port 8001...")
-            loading_thread = threading.Thread(target=start_loading_server, daemon=True)
-            loading_thread.start()
-            # Brief wait for the loading server to bind
-            for _ in range(20):
-                if is_port_open("127.0.0.1", 8001):
-                    loading_server_ok = True
+            # Wait for port 8000 to be ready — up to 15 seconds, polling every 50ms.
+            # uvicorn with log_config=None typically binds within ~100-200ms.
+            # Opening Edge only AFTER the server is ready avoids ERR_CONNECTION_REFUSED.
+            # We no longer use a separate port-8001 loading server: navigating from
+            # :8001 → :8000 is cross-origin in Chromium app mode and causes the
+            # app window to close immediately.
+            _log("Waiting for port 8000 to be ready...")
+            server_ready = False
+            for i in range(300):  # 300 × 50ms = 15 seconds max
+                if is_port_open("127.0.0.1", 8000):
+                    server_ready = True
+                    _log(f"Server ready after ~{i * 50}ms")
                     break
                 time.sleep(0.05)
-        else:
-            loading_server_ok = True
 
-        _log(f"Loading server on 8001: {loading_server_ok}")
+            if not server_ready:
+                _log("WARNING: Server did not start within 15 seconds — opening Edge anyway.")
 
         edge_path = find_edge()
         _log(f"Edge path: {edge_path}")
 
         if edge_path:
-            if loading_server_ok:
-                # Serve loading.html over HTTP (no CORS issues between :8001 and :8000)
-                start_url = "--app=http://127.0.0.1:8001/loading.html"
-            else:
-                # Fallback: wait for main server, open directly
-                _log("Loading server failed — waiting for main server...")
-                for _ in range(300):
-                    if is_port_open("127.0.0.1", 8000):
-                        break
-                    time.sleep(0.1)
-                start_url = "--app=http://127.0.0.1:8000"
-
-            _log(f"Opening Edge with: {start_url}")
-
-            # Use a dedicated user-data-dir so Edge always runs as its OWN process.
-            # Without this, if Edge is already open, the launched process exits immediately
-            # (it delegates the URL to the existing instance), causing proc.wait() to return at once.
+            # Use a dedicated user-data-dir so Edge spawns its own process.
+            # Without this, if Edge is already running, the launched process exits
+            # immediately (it delegates to the existing instance), and proc.wait()
+            # returns at once, killing the daemon server thread.
             edge_profile = os.path.join(base_dir, ".td-edge-profile")
             os.makedirs(edge_profile, exist_ok=True)
+
+            start_url = "--app=http://127.0.0.1:8000"
+            _log(f"Opening Edge with: {start_url}")
 
             proc = subprocess.Popen(
                 [
@@ -564,13 +531,9 @@ if __name__ == "__main__":
             )
             _log("Edge opened — waiting for it to close...")
             proc.wait()
-            _log("Edge closed — exiting.")
+            _log(f"Edge closed (exit code {proc.returncode}) — exiting.")
         else:
             _log("Edge not found — falling back to default browser.")
-            for _ in range(300):
-                if is_port_open("127.0.0.1", 8000):
-                    break
-                time.sleep(0.1)
             import webbrowser
             webbrowser.open("http://127.0.0.1:8000")
             try:
