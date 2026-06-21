@@ -443,7 +443,10 @@ def _log(msg):
 def start_server():
     _log("[SERVER] uvicorn.run() starting on port 8000...")
     try:
-        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_level="error")
+        # log_config=None is required when running as --noconsole PyInstaller exe:
+        # sys.stdout is None in that context, and uvicorn's default logging formatter
+        # calls sys.stdout.isatty() which raises AttributeError on NoneType.
+        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_config=None)
         _log("[SERVER] uvicorn exited normally")
     except Exception as e:
         _log(f"[SERVER] CRASH: {e}")
@@ -540,10 +543,18 @@ if __name__ == "__main__":
                 start_url = "--app=http://127.0.0.1:8000"
 
             _log(f"Opening Edge with: {start_url}")
+
+            # Use a dedicated user-data-dir so Edge always runs as its OWN process.
+            # Without this, if Edge is already open, the launched process exits immediately
+            # (it delegates the URL to the existing instance), causing proc.wait() to return at once.
+            edge_profile = os.path.join(base_dir, ".td-edge-profile")
+            os.makedirs(edge_profile, exist_ok=True)
+
             proc = subprocess.Popen(
                 [
                     edge_path,
                     start_url,
+                    f"--user-data-dir={edge_profile}",
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-extensions",
