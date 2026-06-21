@@ -413,133 +413,25 @@ frontend_dir = os.path.abspath(os.path.join(base_dir, "frontend"))
 app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
 
 
-def is_port_open(host, port, timeout=0.1):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(timeout)
-            s.connect((host, port))
-            return True
-    except Exception:
-        return False
 
-
-# Simple file-based logger for diagnosing frozen exe startup issues
-_log_path = os.path.join(base_dir, "app_debug.log")
-
-
-def _log(msg):
-    try:
-        ts = time.strftime("%H:%M:%S")
-        with open(_log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] {msg}\n")
-    except Exception:
-        pass
-
-
-def start_server():
-    _log("[SERVER] uvicorn.run() starting on port 8000...")
-    try:
-        # log_config=None is required when running as --noconsole PyInstaller exe:
-        # sys.stdout is None in that context, and uvicorn's default logging formatter
-        # calls sys.stdout.isatty() which raises AttributeError on NoneType.
-        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_config=None)
-        _log("[SERVER] uvicorn exited normally")
-    except Exception as e:
-        _log(f"[SERVER] CRASH: {e}")
-        import traceback
-        _log(traceback.format_exc())
-
-
-def find_edge():
-    """Locate Microsoft Edge executable on Windows."""
-    candidates = [
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-    return None
+def open_browser():
+    # Wait a brief moment for uvicorn to bind
+    time.sleep(1.2)
+    print("[System] Opening application in your default web browser...")
+    import webbrowser
+    webbrowser.open("http://127.0.0.1:8000")
 
 
 if __name__ == "__main__":
-    # Initialize debug log
-    with open(_log_path, "w", encoding="utf-8") as _f:
-        _f.write(f"=== TD-markitdown startup log - {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-    _log(f"Frozen: {getattr(sys, 'frozen', False)}")
-    _log(f"base_dir: {base_dir}")
-    _log(f"frontend_dir: {frontend_dir} exists={os.path.exists(frontend_dir)}")
-
-    if "--no-gui" in sys.argv:
-        # Headless server mode (for development / run.bat)
-        uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, log_config=None)
-    else:
-        # --- GUI Mode: Edge App Window ---
-
-        server_already_running = is_port_open("127.0.0.1", 8000)
-        _log(f"Server already on 8000: {server_already_running}")
-
-        if not server_already_running:
-            _log("Starting FastAPI server thread...")
-            server_thread = threading.Thread(target=start_server, daemon=True)
-            server_thread.start()
-
-            # Wait for port 8000 to be ready — up to 15 seconds, polling every 50ms.
-            # uvicorn with log_config=None typically binds within ~100-200ms.
-            # Opening Edge only AFTER the server is ready avoids ERR_CONNECTION_REFUSED.
-            # We no longer use a separate port-8001 loading server: navigating from
-            # :8001 → :8000 is cross-origin in Chromium app mode and causes the
-            # app window to close immediately.
-            _log("Waiting for port 8000 to be ready...")
-            server_ready = False
-            for i in range(300):  # 300 × 50ms = 15 seconds max
-                if is_port_open("127.0.0.1", 8000):
-                    server_ready = True
-                    _log(f"Server ready after ~{i * 50}ms")
-                    break
-                time.sleep(0.05)
-
-            if not server_ready:
-                _log("WARNING: Server did not start within 15 seconds — opening Edge anyway.")
-
-        edge_path = find_edge()
-        _log(f"Edge path: {edge_path}")
-
-        if edge_path:
-            # Use a dedicated user-data-dir so Edge spawns its own process.
-            # Without this, if Edge is already running, the launched process exits
-            # immediately (it delegates to the existing instance), and proc.wait()
-            # returns at once, killing the daemon server thread.
-            edge_profile = os.path.join(base_dir, ".td-edge-profile")
-            os.makedirs(edge_profile, exist_ok=True)
-
-            start_url = "--app=http://127.0.0.1:8000"
-            _log(f"Opening Edge with: {start_url}")
-
-            proc = subprocess.Popen(
-                [
-                    edge_path,
-                    start_url,
-                    f"--user-data-dir={edge_profile}",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-extensions",
-                    "--new-window",
-                ],
-                creationflags=0x08000000
-            )
-            _log("Edge opened — waiting for it to close...")
-            proc.wait()
-            _log(f"Edge closed (exit code {proc.returncode}) — exiting.")
-        else:
-            _log("Edge not found — falling back to default browser.")
-            import webbrowser
-            webbrowser.open("http://127.0.0.1:8000")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
-
-        sys.exit(0)
+    print("===================================================")
+    print("            TD-markitdown Console Server")
+    print("===================================================")
+    print(f"Base Directory: {base_dir}")
+    print(f"Frontend Directory: {frontend_dir}")
+    
+    # Start thread to automatically open the default browser once uvicorn is up
+    threading.Thread(target=open_browser, daemon=True).start()
+    
+    print("Starting uvicorn server on http://127.0.0.1:8000 ...")
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
+    sys.exit(0)
